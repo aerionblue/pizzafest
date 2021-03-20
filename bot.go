@@ -22,7 +22,7 @@ func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
 		return
 	}
 	// TODO(aerion): Batch up multiple sub gifts. Maybe the answer here is to catch the community sub event and then ignore all gift sub events for a certain period of time.
-	log.Printf("new subscription by %v worth %d dollars (tier: %s, months: %d, count: %d)", ev.Owner, ev.DollarValue(), ev.Tier, ev.DurationMonths, ev.Count)
+	log.Printf("new subscription by %v worth %d dollars (tier: %s, months: %d, count: %d)", ev.Owner, ev.DollarValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
 }
 
 func main() {

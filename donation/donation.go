@@ -33,29 +33,68 @@ const (
 	sub
 )
 
+type SubTier int
+
+const (
+	unknownTier SubTier = 0
+	SubTier1            = 1
+	SubTier2            = 2
+	SubTier3            = 3
+)
+
+func (s SubTier) Marshal() int {
+	return int(s)
+}
+
+// UnmarshalSubTier converts an int to a SubTier.
+func UnmarshalSubTier(n int) SubTier {
+	switch n {
+	case 1:
+		return SubTier1
+	case 2:
+		return SubTier2
+	case 3:
+		return SubTier3
+	}
+	return unknownTier
+}
+
+// parseSubTier converts the sub tier parameter from a Twitch IRC message to a SubTier.
+func parseSubTier(s string) SubTier {
+	switch s {
+	case subPlanPrime, subPlanTier1:
+		return SubTier1
+	case subPlanTier2:
+		return SubTier2
+	case subPlanTier3:
+		return SubTier3
+	}
+	return unknownTier
+}
+
 type Event struct {
 	// Twitch username of the user who gets credit for this sub.
 	Owner string
-	// The number of subscriptions given at once.
-	Count int
-	// The subscription tier. TODO(aerion): Define a type for this.
-	Tier string
+	// The number of subscriptions. Equal to 1 for regular subs and resubs. Can be more than 1 when multiple subs are gifted at once.
+	SubCount int
+	// The subscription tier.
+	SubTier SubTier
 	// How many months were purchased at once. Used for multi-month gifts. Equal to 1 for non-gifted subs.
-	DurationMonths int
+	SubMonths int
 }
 
 // DollarValue returns the dollar value this event should contribute to a bid war.
 func (e Event) DollarValue() int {
 	tierMultiplier := 1
-	switch e.Tier {
-	case subPlanPrime, subPlanTier1:
+	switch e.SubTier {
+	case SubTier1:
 		tierMultiplier = 1
-	case subPlanTier2:
+	case SubTier2:
 		tierMultiplier = 2
-	case subPlanTier3:
+	case SubTier3:
 		tierMultiplier = 6
 	}
-	return subDollarValue * tierMultiplier * e.DurationMonths * e.Count
+	return subDollarValue * tierMultiplier * e.SubMonths * e.SubCount
 }
 
 // ParseSubEvent parses a USERNOTICE message into an Event. Returns (Event{}, false) if the message does not represent a subscription.
@@ -65,25 +104,25 @@ func ParseSubEvent(m twitch.UserNoticeMessage) (Event, bool) {
 		return Event{}, false
 	}
 
-	ev := Event{Owner: m.User.Name, Count: 1, DurationMonths: 1}
+	ev := Event{Owner: m.User.Name, SubCount: 1, SubMonths: 1}
 	for name, value := range m.MsgParams {
 		switch name {
 		case msgParamSubPlan:
-			ev.Tier = value
+			ev.SubTier = parseSubTier(value)
 		case msgParamGiftMonths:
 			n, err := strconv.Atoi(value)
 			if err != nil {
 				log.Printf("unexpected value for %s param: %v", msgParamGiftMonths, err)
 				n = 1
 			}
-			ev.DurationMonths = n
+			ev.SubMonths = n
 		case msgParamMassGiftCount:
 			n, err := strconv.Atoi(value)
 			if err != nil {
 				log.Printf("unexpected value for %s param: %v", msgParamMassGiftCount, err)
 				n = 1
 			}
-			ev.Count = n
+			ev.SubCount = n
 		}
 	}
 	return ev, true
