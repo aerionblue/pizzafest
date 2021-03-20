@@ -15,8 +15,8 @@ import (
 const testIRCAddress = "irc.fdgt.dev:6667"
 
 type bot struct {
-	ircClient *twitch.Client
-	dbClient  *db.Client
+	ircClient  *twitch.Client
+	dbRecorder db.Recorder
 }
 
 func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
@@ -26,7 +26,7 @@ func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
 	}
 	// TODO(aerion): Batch up multiple sub gifts. Maybe the answer here is to catch the community sub event and then ignore all gift sub events for a certain period of time.
 	log.Printf("new subscription by %v worth %d dollars (tier: %d, months: %d, count: %d)", ev.Owner, ev.DollarValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
-	if err := b.dbClient.RecordDonation(ev); err != nil {
+	if err := b.dbRecorder.RecordDonation(ev); err != nil {
 		log.Printf("ERROR writing sub to db: %v", err)
 	}
 }
@@ -37,7 +37,7 @@ func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
 		return
 	}
 	log.Printf("new bits donation by %v worth %d dollars (bits: %d)", ev.Owner, ev.DollarValue(), ev.Bits)
-	if err := b.dbClient.RecordDonation(ev); err != nil {
+	if err := b.dbRecorder.RecordDonation(ev); err != nil {
 		log.Printf("ERROR writing bits donation to db: %v", err)
 	}
 }
@@ -58,12 +58,12 @@ func main() {
 		ircClient.TLS = false
 	}
 
-	dbClient, err := db.NewClient(context.Background(), *firestoreCredsPath)
+	dbRecorder, err := db.NewFirestoreClient(context.Background(), *firestoreCredsPath)
 	if err != nil {
 		log.Fatal("error connecting to db: %v", err)
 	}
 
-	b := &bot{ircClient, dbClient}
+	b := &bot{ircClient, dbRecorder}
 
 	ircClient.OnUserNoticeMessage(func(m twitch.UserNoticeMessage) {
 		b.dispatchUserNoticeMessage(m)
