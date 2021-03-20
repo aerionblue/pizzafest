@@ -106,7 +106,7 @@ func ParseSubEvent(m twitch.UserNoticeMessage) (Event, bool) {
 		return Event{}, false
 	}
 
-	ev := Event{Owner: m.User.Name, SubCount: 1, SubMonths: 1}
+	ev := Event{Owner: m.User.Name, SubCount: 1, SubMonths: 1, Message: m.Message}
 	for name, value := range m.MsgParams {
 		switch name {
 		case msgParamSubPlan:
@@ -144,5 +144,5 @@ func ParseBitsEvent(m twitch.PrivateMessage) (Event, bool) {
 	if m.Bits <= 0 {
 		return Event{}, false
 	}
-	return Event{Owner: m.User.Name, Bits: m.Bits}, true
+	return Event{Owner: m.User.Name, Bits: m.Bits, Message: m.Message}, true
 }

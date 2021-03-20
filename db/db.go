@@ -53,4 +53,5 @@ type donationDoc struct {
 	SubTier      int    `firestore:"subTier,omitempty"`
 	SubMonths    int    `firestore:"subMonths,omitempty"`
 	Bits         int    `firestore:"bits,omitempty"`
+	Message      string `firestore:"message,omitempty"`
 }
