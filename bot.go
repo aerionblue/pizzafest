@@ -25,9 +25,20 @@ func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
 		return
 	}
 	// TODO(aerion): Batch up multiple sub gifts. Maybe the answer here is to catch the community sub event and then ignore all gift sub events for a certain period of time.
-	log.Printf("new subscription by %v worth %d dollars (tier: %s, months: %d, count: %d)", ev.Owner, ev.DollarValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
+	log.Printf("new subscription by %v worth %d dollars (tier: %d, months: %d, count: %d)", ev.Owner, ev.DollarValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
 	if err := b.dbClient.RecordDonation(ev); err != nil {
 		log.Printf("ERROR writing sub to db: %v", err)
+	}
+}
+
+func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
+	ev, ok := donation.ParseBitsEvent(m)
+	if !ok {
+		return
+	}
+	log.Printf("new bits donation by %v worth %d dollars (bits: %d)", ev.Owner, ev.DollarValue(), ev.Bits)
+	if err := b.dbClient.RecordDonation(ev); err != nil {
+		log.Printf("ERROR writing bits donation to db: %v", err)
 	}
 }
 
@@ -57,12 +68,17 @@ func main() {
 	ircClient.OnUserNoticeMessage(func(m twitch.UserNoticeMessage) {
 		b.dispatchUserNoticeMessage(m)
 	})
+	ircClient.OnPrivateMessage(func(m twitch.PrivateMessage) {
+		b.dispatchPrivateMessage(m)
+	})
 	ircClient.Join(*targetChannel)
 
 	if !*prod {
 		go func() {
 			<-time.After(2 * time.Second)
 			ircClient.Say(*targetChannel, "subgift --tier 2 --months 6 --username usedpizza --username2 AEWC20XX")
+			ircClient.Say(*targetChannel, `bits --bitscount 250 --message "oh! it's slugma!" --username "TWRoxas"`)
+			ircClient.Say(*targetChannel, `this is a fake bits message cheer6969`)
 		}()
 	}
 

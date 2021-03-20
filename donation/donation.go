@@ -81,6 +81,8 @@ type Event struct {
 	SubTier SubTier
 	// How many months were purchased at once. Used for multi-month gifts. Equal to 1 for non-gifted subs.
 	SubMonths int
+	// The number of bits donated.
+	Bits int
 }
 
 // DollarValue returns the dollar value this event should contribute to a bid war.
@@ -94,7 +96,7 @@ func (e Event) DollarValue() int {
 	case SubTier3:
 		tierMultiplier = 6
 	}
-	return subDollarValue * tierMultiplier * e.SubMonths * e.SubCount
+	return subDollarValue*tierMultiplier*e.SubMonths*e.SubCount + e.Bits/100
 }
 
 // ParseSubEvent parses a USERNOTICE message into an Event. Returns (Event{}, false) if the message does not represent a subscription.
@@ -136,4 +138,11 @@ func toSubEventType(msgID string) EventType {
 	}
 	// TODO(aerion): Maybe handle "giftpaidupgrade", "anongiftpaidupgrade" if they actually happen.
 	return unknown
+}
+
+func ParseBitsEvent(m twitch.PrivateMessage) (Event, bool) {
+	if m.Bits <= 0 {
+		return Event{}, false
+	}
+	return Event{Owner: m.User.Name, Bits: m.Bits}, true
 }
