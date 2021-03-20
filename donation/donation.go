@@ -83,6 +83,8 @@ type Event struct {
 	SubMonths int
 	// The number of bits donated.
 	Bits int
+	// The chat message included with the event.
+	Message string
 }
 
 // DollarValue returns the dollar value this event should contribute to a bid war.
