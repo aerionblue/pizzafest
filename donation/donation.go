@@ -46,6 +46,18 @@ func (s SubTier) Marshal() int {
 	return int(s)
 }
 
+func (s SubTier) multiplier() int {
+	switch s {
+	case SubTier1:
+		return 1
+	case SubTier2:
+		return 2
+	case SubTier3:
+		return 6
+	}
+	return 0
+}
+
 // UnmarshalSubTier converts an int to a SubTier.
 func UnmarshalSubTier(n int) SubTier {
 	switch n {
@@ -89,16 +101,12 @@ type Event struct {
 
 // DollarValue returns the dollar value this event should contribute to a bid war.
 func (e Event) DollarValue() int {
-	tierMultiplier := 1
-	switch e.SubTier {
-	case SubTier1:
-		tierMultiplier = 1
-	case SubTier2:
-		tierMultiplier = 2
-	case SubTier3:
-		tierMultiplier = 6
-	}
-	return subDollarValue*tierMultiplier*e.SubMonths*e.SubCount + e.Bits/100
+	return subDollarValue*e.SubValue() + e.Bits/100
+}
+
+// SubValue returns this event's equivalent value in Tier 1 subscriptions.
+func (e Event) SubValue() int {
+	return e.SubTier.multiplier() * e.SubMonths * e.SubCount
 }
 
 // ParseSubEvent parses a USERNOTICE message into an Event. Returns (Event{}, false) if the message does not represent a subscription.

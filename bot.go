@@ -14,6 +14,10 @@ import (
 
 const testIRCAddress = "irc.fdgt.dev:6667"
 
+// Hard-coded to a testing sheet, for now.
+const spreadsheetID = "192vz0Kskkcv3vGuCnRDLlpdwc8_1fuU4Am5g7M7YrO8"
+const bidTrackerSheetName = "Bid war worksheet"
+
 type bot struct {
 	ircClient  *twitch.Client
 	dbRecorder db.Recorder
@@ -46,6 +50,8 @@ func main() {
 	prod := flag.Bool("prod", false, "Whether to use real twitch.tv IRC. If false, connects to fdgt instead.")
 	targetChannel := flag.String("channel", "aerionblue", "The IRC channel to listen to")
 	firestoreCredsPath := flag.String("firestore_creds", "", "Path to the Firestore credentials file")
+	sheetsCredsPath := flag.String("sheets_creds", "", "Path to the Google Sheets OAuth client secret file")
+	sheetsTokenPath := flag.String("sheets_token", "", "Path to the Google Sheets OAuth token. If absent, you will be prompted to create a new token")
 	flag.Parse()
 
 	ircClient := twitch.NewAnonymousClient()
@@ -58,9 +64,27 @@ func main() {
 		ircClient.TLS = false
 	}
 
-	dbRecorder, err := db.NewFirestoreClient(context.Background(), *firestoreCredsPath)
-	if err != nil {
-		log.Fatal("error connecting to db: %v", err)
+	var dbRecorder db.Recorder
+	if *sheetsCredsPath != "" {
+		cfg := db.SheetsClientConfig{
+			SpreadsheetID:    spreadsheetID,
+			SheetName:        bidTrackerSheetName,
+			ClientSecretPath: *sheetsCredsPath,
+			OAuthTokenPath:   *sheetsTokenPath,
+		}
+		var err error
+		dbRecorder, err = db.NewGoogleSheetsClient(context.Background(), cfg)
+		if err != nil {
+			log.Fatalf("error initializing Google Sheets client: %v", err)
+		}
+	} else if *firestoreCredsPath != "" {
+		var err error
+		dbRecorder, err = db.NewFirestoreClient(context.Background(), *firestoreCredsPath)
+		if err != nil {
+			log.Fatalf("error connecting to Firestore: %v", err)
+		}
+	} else {
+		log.Fatal("no DB config specified; you must provide either Firestore or Google Sheets flags")
 	}
 
 	b := &bot{ircClient, dbRecorder}
