@@ -36,7 +36,7 @@ func (c *sheetsClient) RecordDonation(ev donation.Event) error {
 	valuesSrv := sheets.NewSpreadsheetsValuesService(c.srv)
 	call := valuesSrv.Append(c.spreadsheetID, c.tableRange, &sheets.ValueRange{
 		Values: [][]interface{}{
-			{ev.Owner, "", ev.SubValue(), "", ev.Bits},
+			{ev.Owner, "", cellVal(ev.SubValue()), "", cellVal(ev.Bits)},
 		},
 	})
 	// We use OVERWRITE so that formula cells next to the table are preserved. When INSERT_ROWS inserts a row into the table, those formula cells are left empty.
@@ -45,4 +45,11 @@ func (c *sheetsClient) RecordDonation(ev donation.Event) error {
 		return fmt.Errorf("error appending data to sheet: %v", err)
 	}
 	return nil
+}
+
+func cellVal(n int) interface{} {
+	if n == 0 {
+		return ""
+	}
+	return n
 }
