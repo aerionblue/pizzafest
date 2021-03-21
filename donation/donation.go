@@ -26,11 +26,13 @@ const (
 	subPlanTier3        = "3000"
 )
 
-type EventType int
+type SubEventType int
 
 const (
-	unknown EventType = iota
-	sub
+	unknown SubEventType = iota
+	Subscription
+	GiftSubscription
+	CommunityGift
 )
 
 type SubTier int
@@ -85,6 +87,7 @@ func parseSubTier(s string) SubTier {
 }
 
 type Event struct {
+	Type SubEventType
 	// Twitch username of the user who gets credit for this sub.
 	Owner string
 	// The number of subscriptions. Equal to 1 for regular subs and resubs. Can be more than 1 when multiple subs are gifted at once.
@@ -112,11 +115,11 @@ func (e Event) SubValue() int {
 // ParseSubEvent parses a USERNOTICE message into an Event. Returns (Event{}, false) if the message does not represent a subscription.
 func ParseSubEvent(m twitch.UserNoticeMessage) (Event, bool) {
 	eventType := toSubEventType(m.MsgID)
-	if eventType != sub {
+	if eventType == unknown {
 		return Event{}, false
 	}
 
-	ev := Event{Owner: m.User.Name, SubCount: 1, SubMonths: 1, Message: m.Message}
+	ev := Event{Type: eventType, Owner: m.User.Name, SubCount: 1, SubMonths: 1, Message: m.Message}
 	for name, value := range m.MsgParams {
 		switch name {
 		case msgParamSubPlan:
@@ -141,10 +144,14 @@ func ParseSubEvent(m twitch.UserNoticeMessage) (Event, bool) {
 }
 
 // eventType interprets the msg-id tag of a USERNOTICE message. Not all valid values are listed here; see the docs for a comprehensive list.
-func toSubEventType(msgID string) EventType {
+func toSubEventType(msgID string) SubEventType {
 	switch msgID {
-	case "sub", "resub", "subgift", "submysterygift":
-		return sub
+	case "sub", "resub":
+		return Subscription
+	case "subgift":
+		return GiftSubscription
+	case "submysterygift":
+		return CommunityGift
 	}
 	// TODO(aerion): Maybe handle "giftpaidupgrade", "anongiftpaidupgrade" if they actually happen.
 	return unknown

@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"sync"
 	"time"
 
 	twitch "github.com/gempir/go-twitch-irc/v2"
@@ -21,11 +22,21 @@ const bidTrackerSheetName = "Bid war worksheet"
 type bot struct {
 	ircClient  *twitch.Client
 	dbRecorder db.Recorder
+
+	mu sync.RWMutex
+	// Maps a Twitch username to the last time they gave a community gift sub.
+	communityGifts map[string]time.Time
 }
 
 func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
 	ev, ok := donation.ParseSubEvent(m)
 	if !ok {
+		return
+	}
+	if ev.Type == donation.CommunityGift {
+		b.updateCommunityGift(ev)
+	}
+	if ev.Type == donation.GiftSubscription && b.shouldIgnoreSubGift(ev) {
 		return
 	}
 	// TODO(aerion): Batch up multiple sub gifts. Maybe the answer here is to catch the community sub event and then ignore all gift sub events for a certain period of time.
@@ -44,6 +55,19 @@ func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
 	if err := b.dbRecorder.RecordDonation(ev); err != nil {
 		log.Printf("ERROR writing bits donation to db: %v", err)
 	}
+}
+
+func (b *bot) updateCommunityGift(ev donation.Event) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.communityGifts[ev.Owner] = time.Now()
+}
+
+func (b *bot) shouldIgnoreSubGift(ev donation.Event) bool {
+	// Community gifts cause one event announcing the N-sub gift, and then N individual gift sub events. We try to deduplicate the gift subs that occur soon after a community gift event.
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.communityGifts[ev.Owner].Add(5 * time.Second).After(time.Now())
 }
 
 func main() {
@@ -87,7 +111,7 @@ func main() {
 		log.Fatal("no DB config specified; you must provide either Firestore or Google Sheets flags")
 	}
 
-	b := &bot{ircClient, dbRecorder}
+	b := &bot{ircClient: ircClient, dbRecorder: dbRecorder, communityGifts: make(map[string]time.Time)}
 
 	ircClient.OnUserNoticeMessage(func(m twitch.UserNoticeMessage) {
 		b.dispatchUserNoticeMessage(m)
@@ -101,6 +125,10 @@ func main() {
 		go func() {
 			<-time.After(2 * time.Second)
 			ircClient.Say(*targetChannel, "subgift --tier 2 --months 6 --username usedpizza --username2 AEWC20XX")
+			ircClient.Say(*targetChannel, "submysterygift --username usedpizza --count 3")
+			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 AEWC20XX")
+			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 eldritchdildoes")
+			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 Mia_Khalifa")
 			ircClient.Say(*targetChannel, `bits --bitscount 250 --message "oh! it's slugma!" --username "TWRoxas"`)
 			ircClient.Say(*targetChannel, `this is a fake bits message cheer6969`)
 		}()
