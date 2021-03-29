@@ -36,6 +36,7 @@ func (c *firestoreClient) RecordDonation(ev donation.Event) error {
 		SubCount:     ev.SubCount,
 		SubTier:      ev.SubTier.Marshal(),
 		SubMonths:    ev.SubMonths,
+		Cents:        ev.Cents,
 		Bits:         ev.Bits,
 	}
 	// TODO(aerion): Plumb through a context from the IRC bot.
@@ -51,6 +52,7 @@ type donationDoc struct {
 	SubCount     int    `firestore:"subCount,omitempty"`
 	SubTier      int    `firestore:"subTier,omitempty"`
 	SubMonths    int    `firestore:"subMonths,omitempty"`
+	Cents        int    `firestore:"cents,omitempty"`
 	Bits         int    `firestore:"bits,omitempty"`
 	Message      string `firestore:"message,omitempty"`
 }

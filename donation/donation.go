@@ -98,13 +98,16 @@ type Event struct {
 	SubMonths int
 	// The number of bits donated.
 	Bits int
+	// The number of US cents donated.
+	Cents int
 	// The chat message included with the event.
 	Message string
 }
 
 // DollarValue returns the dollar value this event should contribute to a bid war.
+// TODO(aerion): Express everything as cents instead of dollars.
 func (e Event) DollarValue() int {
-	return subDollarValue*e.SubValue() + e.Bits/100
+	return subDollarValue*e.SubValue() + e.Bits/100 + e.Cents/100
 }
 
 // SubValue returns this event's equivalent value in Tier 1 subscriptions.

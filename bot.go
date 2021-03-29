@@ -11,6 +11,7 @@ import (
 
 	"github.com/aerionblue/pizzafest/db"
 	"github.com/aerionblue/pizzafest/donation"
+	"github.com/aerionblue/pizzafest/streamlabs"
 )
 
 const testIRCAddress = "irc.fdgt.dev:6667"
@@ -57,6 +58,13 @@ func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
 	}
 }
 
+func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
+	log.Printf("new streamlabs donation by %v worth %d dollars (cents: %d)", ev.Owner, ev.DollarValue(), ev.Cents)
+	if err := b.dbRecorder.RecordDonation(ev); err != nil {
+		log.Printf("ERROR writing streamlabs donation to db: %v", err)
+	}
+}
+
 func (b *bot) updateCommunityGift(ev donation.Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -76,6 +84,7 @@ func main() {
 	firestoreCredsPath := flag.String("firestore_creds", "", "Path to the Firestore credentials file")
 	sheetsCredsPath := flag.String("sheets_creds", "", "Path to the Google Sheets OAuth client secret file")
 	sheetsTokenPath := flag.String("sheets_token", "", "Path to the Google Sheets OAuth token. If absent, you will be prompted to create a new token")
+	streamlabsCredsPath := flag.String("streamlabs_creds", "", "Path to a Streamlabs OAuth token. If absent, Streamlabs donation checking will be disabled")
 	flag.Parse()
 
 	ircClient := twitch.NewAnonymousClient()
@@ -89,6 +98,7 @@ func main() {
 	}
 
 	var dbRecorder db.Recorder
+	var donationPoller *streamlabs.DonationPoller
 	if *sheetsCredsPath != "" {
 		cfg := db.SheetsClientConfig{
 			SpreadsheetID:    spreadsheetID,
@@ -110,6 +120,15 @@ func main() {
 	} else {
 		log.Fatal("no DB config specified; you must provide either Firestore or Google Sheets flags")
 	}
+	if *streamlabsCredsPath != "" {
+		var err error
+		donationPoller, err = streamlabs.NewDonationPoller(context.Background(), *streamlabsCredsPath)
+		if err != nil {
+			log.Printf("(non-fatal) error initializing Streamlabs polling: %v", err)
+		}
+	} else {
+		log.Print("no Streamlabs token provided")
+	}
 
 	b := &bot{ircClient: ircClient, dbRecorder: dbRecorder, communityGifts: make(map[string]time.Time)}
 
@@ -120,6 +139,10 @@ func main() {
 		b.dispatchPrivateMessage(m)
 	})
 	ircClient.Join(*targetChannel)
+
+	donationPoller.OnDonation(func(ev donation.Event) {
+		b.dispatchStreamlabsDonation(ev)
+	})
 
 	if !*prod {
 		go func() {
