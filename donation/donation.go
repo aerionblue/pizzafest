@@ -55,7 +55,7 @@ func (s SubTier) multiplier() int {
 	case SubTier2:
 		return 2
 	case SubTier3:
-		return 6
+		return 5
 	}
 	return 0
 }
