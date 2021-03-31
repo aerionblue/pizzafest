@@ -45,7 +45,7 @@ func newSheetsService(ctx context.Context, oauthConfigPath string, tokenPath str
 func getOAuthClient(ctx context.Context, config *oauth2.Config, tokenPath string) (*http.Client, error) {
 	tok, err := tokenFromFile(tokenPath)
 	if err != nil {
-		tok, err = getTokenFromWeb(config)
+		tok, err = getTokenFromWeb(ctx, config)
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +57,7 @@ func getOAuthClient(ctx context.Context, config *oauth2.Config, tokenPath string
 }
 
 // Request a token from the web, then returns the retrieved token.
-func getTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
+func getTokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error) {
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	fmt.Printf("Go to the following link in your browser then type the authorization code: \n%v\n", authURL)
 
@@ -66,7 +66,7 @@ func getTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
 		return nil, err
 	}
 
-	tok, err := config.Exchange(context.TODO(), authCode)
+	tok, err := config.Exchange(ctx, authCode)
 	if err != nil {
 		return nil, err
 	}
