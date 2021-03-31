@@ -34,9 +34,13 @@ func NewGoogleSheetsClient(ctx context.Context, cfg SheetsClientConfig) (*sheets
 
 func (c *sheetsClient) RecordDonation(ev donation.Event) error {
 	valuesSrv := sheets.NewSpreadsheetsValuesService(c.srv)
+	donationVal := ""
+	if ev.Cents > 0 {
+		donationVal = fmt.Sprintf("%0.2f", float64(ev.Cents)/100)
+	}
 	call := valuesSrv.Append(c.spreadsheetID, c.tableRange, &sheets.ValueRange{
 		Values: [][]interface{}{
-			{ev.Owner, "", cellVal(ev.SubValue()), cellVal(ev.Cents / 100), cellVal(ev.Bits)},
+			{ev.Owner, "", cellVal(ev.SubValue()), donationVal, cellVal(ev.Bits)},
 		},
 	})
 	// We use OVERWRITE so that formula cells next to the table are preserved. When INSERT_ROWS inserts a row into the table, those formula cells are left empty.

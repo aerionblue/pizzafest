@@ -59,7 +59,7 @@ func (d *DonationPoller) Start() error {
 	d.lastDonationID = lastID
 	log.Print("starting Streamlabs polling")
 	if len(evs) != 0 {
-		log.Printf("the last known donation is for $%d from %s", evs[0].DollarValue(), evs[0].Owner)
+		log.Printf("the last known donation is for $%0.2f from %s", float64(evs[0].CentsValue())/100, evs[0].Owner)
 	}
 	go func() {
 		for {

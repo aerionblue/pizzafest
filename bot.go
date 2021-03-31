@@ -41,7 +41,7 @@ func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
 		return
 	}
 	// TODO(aerion): Batch up multiple sub gifts. Maybe the answer here is to catch the community sub event and then ignore all gift sub events for a certain period of time.
-	log.Printf("new subscription by %v worth %d dollars (tier: %d, months: %d, count: %d)", ev.Owner, ev.DollarValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
+	log.Printf("new subscription by %v worth %d cents (tier: %d, months: %d, count: %d)", ev.Owner, ev.CentsValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
 	if err := b.dbRecorder.RecordDonation(ev); err != nil {
 		log.Printf("ERROR writing sub to db: %v", err)
 	}
@@ -52,14 +52,14 @@ func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
 	if !ok {
 		return
 	}
-	log.Printf("new bits donation by %v worth %d dollars (bits: %d)", ev.Owner, ev.DollarValue(), ev.Bits)
+	log.Printf("new bits donation by %v worth %d cents (bits: %d)", ev.Owner, ev.CentsValue(), ev.Bits)
 	if err := b.dbRecorder.RecordDonation(ev); err != nil {
 		log.Printf("ERROR writing bits donation to db: %v", err)
 	}
 }
 
 func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
-	log.Printf("new streamlabs donation by %v worth %d dollars (cents: %d)", ev.Owner, ev.DollarValue(), ev.Cents)
+	log.Printf("new streamlabs donation by %v worth %d cents (cents: %d)", ev.Owner, ev.CentsValue(), ev.Cents)
 	if err := b.dbRecorder.RecordDonation(ev); err != nil {
 		log.Printf("ERROR writing streamlabs donation to db: %v", err)
 	}

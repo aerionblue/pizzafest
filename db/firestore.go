@@ -32,7 +32,7 @@ func (c *firestoreClient) RecordDonation(ev donation.Event) error {
 	doc := donationDoc{
 		ISOTimestamp: c.now().UTC().Format(time.RFC3339Nano),
 		Owner:        ev.Owner,
-		Value:        ev.DollarValue(),
+		Value:        ev.CentsValue(),
 		SubCount:     ev.SubCount,
 		SubTier:      ev.SubTier.Marshal(),
 		SubMonths:    ev.SubMonths,

@@ -7,7 +7,7 @@ import (
 	twitch "github.com/gempir/go-twitch-irc/v2"
 )
 
-const subDollarValue = 5
+const subCentsValue = 500
 
 // USERNOTICE message param tag names. See https://dev.twitch.tv/docs/irc/tags for param descriptions.
 const (
@@ -104,10 +104,10 @@ type Event struct {
 	Message string
 }
 
-// DollarValue returns the dollar value this event should contribute to a bid war.
-// TODO(aerion): Express everything as cents instead of dollars.
-func (e Event) DollarValue() int {
-	return subDollarValue*e.SubValue() + e.Bits/100 + e.Cents/100
+// CentsValue returns the value that this event should contribute to a bid war,
+// in US cents.
+func (e Event) CentsValue() int {
+	return subCentsValue*e.SubValue() + e.Bits + e.Cents
 }
 
 // SubValue returns this event's equivalent value in Tier 1 subscriptions.
