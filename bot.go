@@ -140,9 +140,12 @@ func main() {
 	})
 	ircClient.Join(*targetChannel)
 
-	donationPoller.OnDonation(func(ev donation.Event) {
-		b.dispatchStreamlabsDonation(ev)
-	})
+	if donationPoller != nil {
+		donationPoller.OnDonation(func(ev donation.Event) {
+			b.dispatchStreamlabsDonation(ev)
+		})
+		donationPoller.Start()
+	}
 
 	if !*prod {
 		go func() {

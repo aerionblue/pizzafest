@@ -17,25 +17,25 @@ func TestParseDonationResponse(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		jsonResp string
-		wantID   int
-		want     []donation.Event
+		wantIDs  []int
+		wantEvs  []donation.Event
 	}{
 		{
 			"zero donations",
 			`{"data": []}`,
-			0,
+			nil,
 			nil,
 		},
 		{
 			"one donation",
 			makeJsonResp(donationJson1),
-			1000,
+			[]int{1000},
 			[]donation.Event{{Owner: "ShartyMcFly", Cents: 1100, Message: "team mid"}},
 		},
 		{
 			"two donations",
 			makeJsonResp(donationJson2, donationJson1),
-			2000,
+			[]int{1000, 2000},
 			[]donation.Event{
 				{Owner: "ShartyMcFly", Cents: 1100, Message: "team mid"},
 				{Owner: "Konagami", Cents: 10000, Message: "team left"},
@@ -43,15 +43,15 @@ func TestParseDonationResponse(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, lastID, err := parseDonationResponse([]byte(tc.jsonResp))
+			evs, ids, err := parseDonationResponse([]byte(tc.jsonResp))
 			if err != nil {
 				t.Errorf("error parsing json: %v", err)
 			}
-			if !cmp.Equal(got, tc.want) {
-				t.Errorf(cmp.Diff(got, tc.want))
+			if !cmp.Equal(evs, tc.wantEvs) {
+				t.Errorf(cmp.Diff(evs, tc.wantEvs))
 			}
-			if lastID != tc.wantID {
-				t.Errorf("wrong last donation ID: got %v, want %v", lastID, tc.wantID)
+			if !cmp.Equal(ids, tc.wantIDs) {
+				t.Errorf("wrong last donation ID: got %v, want %v", ids, tc.wantIDs)
 			}
 		})
 	}
