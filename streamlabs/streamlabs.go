@@ -52,11 +52,15 @@ func (d *DonationPoller) Start() error {
 	if d.donationCallback == nil {
 		panic("non-nil donation callback must be provided to OnDonation before calling Start")
 	}
-	_, lastID, err := d.doDonationRequest(1, 0)
+	evs, lastID, err := d.doDonationRequest(1, 0)
 	if err != nil {
 		return err
 	}
 	d.lastDonationID = lastID
+	log.Print("starting Streamlabs polling")
+	if len(evs) != 0 {
+		log.Printf("the last known donation is for $%d from %s", evs[0].DollarValue(), evs[0].Owner)
+	}
 	go func() {
 		for {
 			select {
