@@ -1,8 +1,10 @@
 package donation
 
 import (
+	"fmt"
 	"log"
 	"strconv"
+	"strings"
 
 	twitch "github.com/gempir/go-twitch-irc/v2"
 )
@@ -60,6 +62,18 @@ func (s SubTier) multiplier() int {
 	return 0
 }
 
+func (s SubTier) description() string {
+	switch s {
+	case SubTier1:
+		return "Tier 1"
+	case SubTier2:
+		return "Tier 2"
+	case SubTier3:
+		return "Tier 3"
+	}
+	return "unknown"
+}
+
 // UnmarshalSubTier converts an int to a SubTier.
 func UnmarshalSubTier(n int) SubTier {
 	switch n {
@@ -113,6 +127,36 @@ func (e Event) CentsValue() int {
 // SubValue returns this event's equivalent value in Tier 1 subscriptions.
 func (e Event) SubValue() int {
 	return e.SubTier.multiplier() * e.SubMonths * e.SubCount
+}
+
+// Description returns a human-readable description of the event.
+func (e Event) Description() string {
+	// In practice, it's not possible for more than one of bits/dollars/subs
+	// to occur in the same Event, but we still handle it.
+	var parts []string
+	if e.Cents > 0 {
+		parts = append(parts, fmt.Sprintf("$%0.2f donation", float64(e.Cents)/100))
+	}
+	if e.Bits > 0 {
+		parts = append(parts, fmt.Sprintf("%d bits", e.Bits))
+	}
+	if e.SubCount > 0 {
+		var subParts []string
+		if e.SubCount > 1 {
+			subParts = append(subParts, fmt.Sprintf("%dx", e.SubCount))
+		}
+		if e.SubTier != SubTier1 {
+			subParts = append(subParts, e.SubTier.description())
+		}
+		switch e.Type {
+		case Subscription:
+			subParts = append(subParts, "sub")
+		case GiftSubscription, CommunityGift:
+			subParts = append(subParts, "gift sub")
+		}
+		parts = append(parts, strings.Join(subParts, " "))
+	}
+	return strings.Join(parts, " + ")
 }
 
 // ParseSubEvent parses a USERNOTICE message into an Event. Returns (Event{}, false) if the message does not represent a subscription.

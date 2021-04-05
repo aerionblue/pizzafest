@@ -45,10 +45,8 @@ func TestFindOption(t *testing.T) {
 		{"substrings don't count", "dmca takedown", ""},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			opt, ok := bidwars.FindOption(tc.msg)
-			if !ok && tc.want != "" {
-				t.Errorf("got nothing, want %q", tc.want)
-			} else if opt.DisplayName != tc.want {
+			opt := bidwars.FindOption(tc.msg)
+			if opt.DisplayName != tc.want {
 				t.Errorf("got %q, want %q", opt.DisplayName, tc.want)
 			}
 		})
