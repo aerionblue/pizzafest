@@ -2,9 +2,10 @@
 package db
 
 import (
+	"github.com/aerionblue/pizzafest/bidwar"
 	"github.com/aerionblue/pizzafest/donation"
 )
 
 type Recorder interface {
-	RecordDonation(ev donation.Event) error
+	RecordDonation(ev donation.Event, bid bidwar.Option) error
 }

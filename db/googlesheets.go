@@ -6,6 +6,7 @@ import (
 
 	"google.golang.org/api/sheets/v4"
 
+	"github.com/aerionblue/pizzafest/bidwar"
 	"github.com/aerionblue/pizzafest/donation"
 )
 
@@ -32,7 +33,7 @@ func NewGoogleSheetsClient(ctx context.Context, cfg SheetsClientConfig) (*sheets
 	return &sheetsClient{srv, cfg.SpreadsheetID, tableRange}, nil
 }
 
-func (c *sheetsClient) RecordDonation(ev donation.Event) error {
+func (c *sheetsClient) RecordDonation(ev donation.Event, bid bidwar.Option) error {
 	valuesSrv := sheets.NewSpreadsheetsValuesService(c.srv)
 	donationVal := ""
 	if ev.Cents > 0 {
@@ -40,7 +41,7 @@ func (c *sheetsClient) RecordDonation(ev donation.Event) error {
 	}
 	call := valuesSrv.Append(c.spreadsheetID, c.tableRange, &sheets.ValueRange{
 		Values: [][]interface{}{
-			{ev.Owner, "", cellVal(ev.SubValue()), donationVal, cellVal(ev.Bits)},
+			{ev.Owner, bid.DisplayName, cellVal(ev.SubValue()), donationVal, cellVal(ev.Bits)},
 		},
 	})
 	// We use OVERWRITE so that formula cells next to the table are preserved. When INSERT_ROWS inserts a row into the table, those formula cells are left empty.

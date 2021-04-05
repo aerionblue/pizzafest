@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"flag"
+	"io/ioutil"
 	"log"
 	"sync"
 	"time"
 
 	twitch "github.com/gempir/go-twitch-irc/v2"
 
+	"github.com/aerionblue/pizzafest/bidwar"
 	"github.com/aerionblue/pizzafest/db"
 	"github.com/aerionblue/pizzafest/donation"
 	"github.com/aerionblue/pizzafest/streamlabs"
@@ -23,6 +25,7 @@ const bidTrackerSheetName = "Bid war worksheet"
 type bot struct {
 	ircClient  *twitch.Client
 	dbRecorder db.Recorder
+	bidwars    bidwar.Collection
 
 	mu sync.RWMutex
 	// Maps a Twitch username to the last time they gave a community gift sub.
@@ -40,11 +43,8 @@ func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
 	if ev.Type == donation.GiftSubscription && b.shouldIgnoreSubGift(ev) {
 		return
 	}
-	// TODO(aerion): Batch up multiple sub gifts. Maybe the answer here is to catch the community sub event and then ignore all gift sub events for a certain period of time.
 	log.Printf("new subscription by %v worth %d cents (tier: %d, months: %d, count: %d)", ev.Owner, ev.CentsValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
-	if err := b.dbRecorder.RecordDonation(ev); err != nil {
-		log.Printf("ERROR writing sub to db: %v", err)
-	}
+	b.recordDonation(ev)
 }
 
 func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
@@ -53,15 +53,17 @@ func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
 		return
 	}
 	log.Printf("new bits donation by %v worth %d cents (bits: %d)", ev.Owner, ev.CentsValue(), ev.Bits)
-	if err := b.dbRecorder.RecordDonation(ev); err != nil {
-		log.Printf("ERROR writing bits donation to db: %v", err)
-	}
+	b.recordDonation(ev)
 }
 
 func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
 	log.Printf("new streamlabs donation by %v worth %d cents (cents: %d)", ev.Owner, ev.CentsValue(), ev.Cents)
-	if err := b.dbRecorder.RecordDonation(ev); err != nil {
-		log.Printf("ERROR writing streamlabs donation to db: %v", err)
+	b.recordDonation(ev)
+}
+
+func (b *bot) recordDonation(ev donation.Event) {
+	if err := b.dbRecorder.RecordDonation(ev, b.bidwars.FindOption(ev.Message)); err != nil {
+		log.Printf("ERROR writing donation to db: %v", err)
 	}
 }
 
@@ -85,6 +87,7 @@ func main() {
 	sheetsCredsPath := flag.String("sheets_creds", "", "Path to the Google Sheets OAuth client secret file")
 	sheetsTokenPath := flag.String("sheets_token", "", "Path to the Google Sheets OAuth token. If absent, you will be prompted to create a new token")
 	streamlabsCredsPath := flag.String("streamlabs_creds", "", "Path to a Streamlabs OAuth token. If absent, Streamlabs donation checking will be disabled")
+	bidWarDataPath := flag.String("bidwar_data", "", "Path to a JSON file describing the current bid wars")
 	flag.Parse()
 
 	ircClient := twitch.NewAnonymousClient()
@@ -99,6 +102,7 @@ func main() {
 
 	var dbRecorder db.Recorder
 	var donationPoller *streamlabs.DonationPoller
+	var bidwars bidwar.Collection
 	if *sheetsCredsPath != "" {
 		cfg := db.SheetsClientConfig{
 			SpreadsheetID:    spreadsheetID,
@@ -129,8 +133,24 @@ func main() {
 	} else {
 		log.Print("no Streamlabs token provided")
 	}
+	if *bidWarDataPath != "" {
+		var err error
+		data, err := ioutil.ReadFile(*bidWarDataPath)
+		if err != nil {
+			log.Fatalf("could not read bid war data file: %v", err)
+		}
+		bidwars, err = bidwar.Parse(data)
+		if err != nil {
+			log.Fatalf("malformed bid war data file: %v", err)
+		}
+	}
 
-	b := &bot{ircClient: ircClient, dbRecorder: dbRecorder, communityGifts: make(map[string]time.Time)}
+	b := &bot{
+		ircClient:      ircClient,
+		dbRecorder:     dbRecorder,
+		bidwars:        bidwars,
+		communityGifts: make(map[string]time.Time),
+	}
 
 	ircClient.OnUserNoticeMessage(func(m twitch.UserNoticeMessage) {
 		b.dispatchUserNoticeMessage(m)
@@ -155,8 +175,7 @@ func main() {
 			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 AEWC20XX")
 			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 eldritchdildoes")
 			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 Mia_Khalifa")
-			ircClient.Say(*targetChannel, `bits --bitscount 250 --message "oh! it's slugma!" --username "TWRoxas"`)
-			ircClient.Say(*targetChannel, `this is a fake bits message cheer6969`)
+			ircClient.Say(*targetChannel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
 		}()
 	}
 

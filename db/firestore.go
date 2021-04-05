@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/option"
 
+	"github.com/aerionblue/pizzafest/bidwar"
 	"github.com/aerionblue/pizzafest/donation"
 )
 
@@ -27,7 +28,7 @@ func NewFirestoreClient(ctx context.Context, credsPath string) (*firestoreClient
 	return &firestoreClient{client: client, now: time.Now}, nil
 }
 
-func (c *firestoreClient) RecordDonation(ev donation.Event) error {
+func (c *firestoreClient) RecordDonation(ev donation.Event, bid bidwar.Option) error {
 	donations := c.client.Collection("donations")
 	doc := donationDoc{
 		ISOTimestamp: c.now().UTC().Format(time.RFC3339Nano),
@@ -38,6 +39,7 @@ func (c *firestoreClient) RecordDonation(ev donation.Event) error {
 		SubMonths:    ev.SubMonths,
 		Cents:        ev.Cents,
 		Bits:         ev.Bits,
+		BidwarChoice: bid.DisplayName,
 	}
 	// TODO(aerion): Plumb through a context from the IRC bot.
 	_, _, err := donations.Add(context.TODO(), doc)
@@ -54,5 +56,6 @@ type donationDoc struct {
 	SubMonths    int    `firestore:"subMonths,omitempty"`
 	Cents        int    `firestore:"cents,omitempty"`
 	Bits         int    `firestore:"bits,omitempty"`
+	BidwarChoice string `firestore:"bidwarChoice,omitempty"`
 	Message      string `firestore:"message,omitempty"`
 }
