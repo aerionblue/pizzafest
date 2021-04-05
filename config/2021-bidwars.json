@@ -1,0 +1,56 @@
+{
+    "contests": [
+        {
+            "name": "Ape Escape 3 Character",
+            "options": [
+                {
+                    "displayName": "Kei (the boy)",
+                    "aliases": ["kei", "boy", "satoru"]
+                },
+                {
+                    "displayName": "Yumi (the girl)",
+                    "aliases": ["yumi", "girl", "sayaka"]
+                }
+            ]
+        },
+        {
+            "name": "RE2 Remake",
+            "options": [
+                {
+                    "displayName": "Leon",
+                    "aliases": ["leon"]
+                },
+                {
+                    "displayName": "Claire",
+                    "aliases": ["claire"]
+                }
+            ]
+        },
+        {
+            "name": "Wacky Game Day III",
+            "options": [
+                {
+                    "displayName": "Killer is Dead",
+                    "aliases": ["killer"]
+                },
+                {
+                    "displayName": "Shadows of the Damned",
+                    "aliases": ["shadows", "sotd"]
+                }
+            ]
+        },
+        {
+            "name": "GameCube Zelda",
+            "options": [
+                {
+                    "displayName": "Wind Waker",
+                    "aliases": ["ww", "tww", "windwaker"]
+                },
+                {
+                    "displayName": "Twilight Princess",
+                    "aliases": ["tp", "twilight"]
+                }
+            ]
+        }
+    ]
+}
