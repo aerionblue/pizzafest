@@ -18,9 +18,9 @@ import (
 
 const testIRCAddress = "irc.fdgt.dev:6667"
 
-// Hard-coded to a testing sheet, for now.
-const spreadsheetID = "192vz0Kskkcv3vGuCnRDLlpdwc8_1fuU4Am5g7M7YrO8"
-const bidTrackerSheetName = "Bid war worksheet"
+const spreadsheetID = "192vz0Kskkcv3vGuCnRDLlpdwc8_1fuU4Am5g7M7YrO8" // This is the testing sheet ID
+//const spreadsheetID = "1FkioQXOEAe3UylIjTUEpA-1nf0kJ4JD_dU9v2yBFdfE"  // This is the real sheet ID
+const bidTrackerSheetName = "Bid war tracker"
 
 type bot struct {
 	ircClient  *twitch.Client
