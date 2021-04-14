@@ -104,9 +104,22 @@ func main() {
 		ircClient.TLS = false
 	}
 
+	var bidwars bidwar.Collection
+	if *bidWarDataPath != "" {
+		var err error
+		data, err := ioutil.ReadFile(*bidWarDataPath)
+		if err != nil {
+			log.Fatalf("could not read bid war data file: %v", err)
+		}
+		bidwars, err = bidwar.Parse(data)
+		if err != nil {
+			log.Fatalf("malformed bid war data file: %v", err)
+		}
+	}
+
 	var dbRecorder db.Recorder
 	var donationPoller *streamlabs.DonationPoller
-	var bidwars bidwar.Collection
+	var bidwarTallier *bidwar.Tallier
 	if *sheetsCredsPath != "" {
 		var err error
 		sheetsSrv, err := googlesheets.NewService(context.Background(), *sheetsCredsPath, *sheetsTokenPath)
@@ -119,6 +132,15 @@ func main() {
 			SheetName:     bidTrackerSheetName,
 		}
 		dbRecorder = db.NewGoogleSheetsClient(cfg)
+		bidwarTallier = bidwar.NewTallier(sheetsSrv, spreadsheetID, bidwars)
+		bidTotals, err := bidwarTallier.GetTotals()
+		if err != nil {
+			log.Fatalf("error reading current bid war totals: %v", err)
+		}
+		log.Printf("found %d bid war options in the database", len(bidTotals))
+		for _, bt := range bidTotals {
+			log.Printf("Current total for %q is %v cents", bt.Option.DisplayName, bt.Cents)
+		}
 	} else if *firestoreCredsPath != "" {
 		var err error
 		dbRecorder, err = db.NewFirestoreClient(context.Background(), *firestoreCredsPath)
@@ -136,17 +158,6 @@ func main() {
 		}
 	} else {
 		log.Print("no Streamlabs token provided")
-	}
-	if *bidWarDataPath != "" {
-		var err error
-		data, err := ioutil.ReadFile(*bidWarDataPath)
-		if err != nil {
-			log.Fatalf("could not read bid war data file: %v", err)
-		}
-		bidwars, err = bidwar.Parse(data)
-		if err != nil {
-			log.Fatalf("malformed bid war data file: %v", err)
-		}
 	}
 
 	b := &bot{

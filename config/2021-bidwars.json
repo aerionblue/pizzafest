@@ -4,11 +4,11 @@
             "name": "Ape Escape 3 Character",
             "options": [
                 {
-                    "displayName": "Kei (the boy)",
+                    "displayName": "Kei",
                     "aliases": ["kei", "boy", "satoru"]
                 },
                 {
-                    "displayName": "Yumi (the girl)",
+                    "displayName": "Yumi",
                     "aliases": ["yumi", "girl", "sayaka"]
                 }
             ]
@@ -30,11 +30,11 @@
             "name": "Wacky Game Day III",
             "options": [
                 {
-                    "displayName": "Killer is Dead",
+                    "displayName": "Killer",
                     "aliases": ["killer"]
                 },
                 {
-                    "displayName": "Shadows of the Damned",
+                    "displayName": "Shadows",
                     "aliases": ["shadows", "sotd"]
                 }
             ]
@@ -43,11 +43,11 @@
             "name": "GameCube Zelda",
             "options": [
                 {
-                    "displayName": "Wind Waker",
+                    "displayName": "WW",
                     "aliases": ["ww", "tww", "windwaker"]
                 },
                 {
-                    "displayName": "Twilight Princess",
+                    "displayName": "TP",
                     "aliases": ["tp", "twilight"]
                 }
             ]

@@ -4,7 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
+
+	"google.golang.org/api/sheets/v4"
 )
+
+// Google Sheets developer metadata keys. The target spreadsheet must contain
+// metadata with these keys, located at the appropriate columns of the bid war
+// tracker sheet. You'll need to use a separate script to send
+// CreateDeveloperMetadata requests to the API in order to set this up.
+const metadataBidWarNames = "bidWarNames"
+const metadataBidWarTotals = "bidWarTotals"
 
 // Collection is a set of bid wars.
 type Collection struct {
@@ -104,4 +114,91 @@ func Parse(rawJson []byte) (Collection, error) {
 		return Collection{}, err
 	}
 	return c, nil
+}
+
+// Total is the total money contributed towards the given bid war Option.
+type Total struct {
+	Option Option
+	Cents  int // The total number of US cents contributed towards this option.
+}
+
+// Tallier assigns donations to bid war options and reports bid totals.
+type Tallier struct {
+	sheetsSrv     *sheets.Service
+	spreadsheetID string
+	collection    Collection
+}
+
+// NewTallier creates a Tallier.
+func NewTallier(srv *sheets.Service, spreadsheetID string, collection Collection) *Tallier {
+	return &Tallier{srv, spreadsheetID, collection}
+}
+
+// GetTotals looks up the current total for each bid war Option. The totals
+// are returned in arbitrary order.
+func (t Tallier) GetTotals() ([]Total, error) {
+	getReq := &sheets.BatchGetValuesByDataFilterRequest{
+		DataFilters: []*sheets.DataFilter{
+			{
+				DeveloperMetadataLookup: &sheets.DeveloperMetadataLookup{
+					MetadataKey: metadataBidWarNames,
+				},
+			},
+			{
+				DeveloperMetadataLookup: &sheets.DeveloperMetadataLookup{
+					MetadataKey: metadataBidWarTotals,
+				},
+			},
+		},
+		MajorDimension: "COLUMNS",
+	}
+	getResp, err := t.sheetsSrv.Spreadsheets.Values.BatchGetByDataFilter(t.spreadsheetID, getReq).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	var rawNames, rawTotals []interface{}
+	for _, vr := range getResp.ValueRanges {
+		for _, df := range vr.DataFilters {
+			if df.DeveloperMetadataLookup.MetadataKey == metadataBidWarNames {
+				rawNames = vr.ValueRange.Values[0]
+				continue
+			}
+			if df.DeveloperMetadataLookup.MetadataKey == metadataBidWarTotals {
+				rawTotals = vr.ValueRange.Values[0]
+				continue
+			}
+		}
+	}
+
+	optsMap := make(map[string]Option)
+	for _, contest := range t.collection.Contests {
+		for _, option := range contest.Options {
+			optsMap[option.DisplayName] = option
+		}
+	}
+
+	var totals []Total
+	for i := 0; i < len(rawNames) && i < len(rawTotals); i++ {
+		if rawTotals[i] != "" {
+			var n, v string
+			var ok bool
+			if n, ok = rawNames[i].(string); !ok {
+				return nil, fmt.Errorf("expected string, got %T for value %v", rawNames[i], rawNames[i])
+			}
+			if v, ok = rawTotals[i].(string); !ok {
+				return nil, fmt.Errorf("expected string, got %T for value %v", rawTotals[i], rawTotals[i])
+			}
+			var opt Option
+			if opt, ok = optsMap[n]; !ok {
+				continue
+			}
+			dollars, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid total for %v: %v", n, v)
+			}
+			totals = append(totals, Total{Option: opt, Cents: int(dollars * 100)})
+		}
+	}
+	return totals, nil
 }
