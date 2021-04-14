@@ -25,7 +25,7 @@ const testJSON = `{
 }
 `
 
-func TestFindOption(t *testing.T) {
+func TestChoiceFromMessage(t *testing.T) {
 	bidwars, err := Parse([]byte(testJSON))
 	if err != nil {
 		t.Fatalf("error parsing test data: %v", err)
@@ -45,9 +45,9 @@ func TestFindOption(t *testing.T) {
 		{"substrings don't count", "dmca takedown", ""},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			opt := bidwars.FindOption(tc.msg)
-			if opt.DisplayName != tc.want {
-				t.Errorf("got %q, want %q", opt.DisplayName, tc.want)
+			got := bidwars.ChoiceFromMessage(tc.msg, FromChatMessage)
+			if got.Option.DisplayName != tc.want {
+				t.Errorf("got %q, want %q", got.Option.DisplayName, tc.want)
 			}
 		})
 	}

@@ -33,12 +33,17 @@ func NewGoogleSheetsClient(ctx context.Context, cfg SheetsClientConfig) (*sheets
 	return &sheetsClient{srv, cfg.SpreadsheetID, tableRange}, nil
 }
 
-func (c *sheetsClient) RecordDonation(ev donation.Event, bid bidwar.Option) error {
+func (c *sheetsClient) RecordDonation(ev donation.Event, bid bidwar.Choice) error {
 	valuesSrv := sheets.NewSpreadsheetsValuesService(c.srv)
 	call := valuesSrv.Append(c.spreadsheetID, c.tableRange, &sheets.ValueRange{
 		Values: [][]interface{}{
-			// TODO(aerion): Fill the "Source" column explaining why we allocated it to a certain bid war.
-			{ev.Owner, ev.Description(), fmt.Sprintf("%0.2f", float64(ev.CentsValue())/100), bid.DisplayName},
+			{
+				ev.Owner,
+				ev.Description(),
+				fmt.Sprintf("%0.2f", float64(ev.CentsValue())/100),
+				bid.Option.DisplayName,
+				bid.Reason,
+			},
 		},
 	})
 	// We use OVERWRITE so that formula cells next to the table are preserved. When INSERT_ROWS inserts a row into the table, those formula cells are left empty.

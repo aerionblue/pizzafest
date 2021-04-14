@@ -27,12 +27,26 @@ type Option struct {
 	Aliases []alias
 }
 
-// FindOption determines whether the given donation message or chat message
-// mentioned one of the bid war options in this Collection, and returns that
-// Option. If no bid war option was found, returns the zero Option. If more
-// than one Option matches, returns the match that occurs earliest (leftmost)
-// in the message.
-func (c Collection) FindOption(msg string) Option {
+// Choice is a choice that a donor made for the bid war.
+type Choice struct {
+	Option Option // The donor's chosen Option.
+	Reason string // The reason we allocated the donation to the Option.
+}
+
+type ChoiceReason int
+
+const (
+	FromChatMessage ChoiceReason = iota
+	FromDonationMessage
+	FromSubMessage
+)
+
+// ChoiceFromMessage determines whether the given donation message or chat
+// message mentioned one of the bid war options in this Collection, and returns
+// a Choice representing that Option. If no bid war option was found, returns
+// the zero value. If more than one Option matches, returns the match that
+// occurs earliest (leftmost) in the message.
+func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 	minIndex := -1
 	minOpt := Option{}
 	for _, con := range c.Contests {
@@ -48,7 +62,22 @@ func (c Collection) FindOption(msg string) Option {
 			}
 		}
 	}
-	return minOpt
+	return Choice{Option: minOpt, Reason: reasonString(reason, msg)}
+}
+
+func reasonString(reason ChoiceReason, msg string) string {
+	if msg == "" {
+		return ""
+	}
+	switch reason {
+	case FromChatMessage:
+		return "[chat] " + msg
+	case FromDonationMessage:
+		return "[donation msg] " + msg
+	case FromSubMessage:
+		return "[sub msg] " + msg
+	}
+	return ""
 }
 
 type alias struct {

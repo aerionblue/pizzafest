@@ -7,5 +7,5 @@ import (
 )
 
 type Recorder interface {
-	RecordDonation(ev donation.Event, bid bidwar.Option) error
+	RecordDonation(ev donation.Event, bid bidwar.Choice) error
 }

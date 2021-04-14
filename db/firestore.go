@@ -28,7 +28,7 @@ func NewFirestoreClient(ctx context.Context, credsPath string) (*firestoreClient
 	return &firestoreClient{client: client, now: time.Now}, nil
 }
 
-func (c *firestoreClient) RecordDonation(ev donation.Event, bid bidwar.Option) error {
+func (c *firestoreClient) RecordDonation(ev donation.Event, bid bidwar.Choice) error {
 	donations := c.client.Collection("donations")
 	doc := donationDoc{
 		ISOTimestamp: c.now().UTC().Format(time.RFC3339Nano),
@@ -39,7 +39,7 @@ func (c *firestoreClient) RecordDonation(ev donation.Event, bid bidwar.Option) e
 		SubMonths:    ev.SubMonths,
 		Cents:        ev.Cents,
 		Bits:         ev.Bits,
-		BidwarChoice: bid.DisplayName,
+		BidwarChoice: bid.Option.DisplayName,
 	}
 	// TODO(aerion): Plumb through a context from the IRC bot.
 	_, _, err := donations.Add(context.TODO(), doc)

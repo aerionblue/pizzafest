@@ -44,7 +44,8 @@ func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
 		return
 	}
 	log.Printf("new subscription by %v worth %d cents (tier: %d, months: %d, count: %d)", ev.Owner, ev.CentsValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
-	b.recordDonation(ev)
+	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromSubMessage)
+	b.recordDonation(ev, bid)
 }
 
 func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
@@ -53,16 +54,18 @@ func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
 		return
 	}
 	log.Printf("new bits donation by %v worth %d cents (bits: %d)", ev.Owner, ev.CentsValue(), ev.Bits)
-	b.recordDonation(ev)
+	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromChatMessage)
+	b.recordDonation(ev, bid)
 }
 
 func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
 	log.Printf("new streamlabs donation by %v worth %d cents (cents: %d)", ev.Owner, ev.CentsValue(), ev.Cents)
-	b.recordDonation(ev)
+	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromDonationMessage)
+	b.recordDonation(ev, bid)
 }
 
-func (b *bot) recordDonation(ev donation.Event) {
-	if err := b.dbRecorder.RecordDonation(ev, b.bidwars.FindOption(ev.Message)); err != nil {
+func (b *bot) recordDonation(ev donation.Event, bid bidwar.Choice) {
+	if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
 		log.Printf("ERROR writing donation to db: %v", err)
 	}
 }
