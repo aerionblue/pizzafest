@@ -1,4 +1,5 @@
-package db
+// Package googlesheets instantiates a Google Sheets API service.
+package googlesheets
 
 import (
 	"context"
@@ -17,8 +18,8 @@ import (
 
 // Largely adapted from https://developers.google.com/sheets/api/quickstart/go
 
-// Creates a client for Google Sheets. If the tokenPath does not contain a Google Sheets OAuth token, the user will be prompted to create one, and the new token will be written to tokenPath.
-func newSheetsService(ctx context.Context, oauthConfigPath string, tokenPath string) (*sheets.Service, error) {
+// NewService creates a client for Google Sheets. If the tokenPath does not contain a Google Sheets OAuth token, the user will be prompted to create one, and the new token will be written to tokenPath.
+func NewService(ctx context.Context, oauthConfigPath string, tokenPath string) (*sheets.Service, error) {
 	b, err := ioutil.ReadFile(oauthConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read Google OAuth client secret file: %v", err)

@@ -1,7 +1,6 @@
 package db
 
 import (
-	"context"
 	"fmt"
 
 	"google.golang.org/api/sheets/v4"
@@ -17,20 +16,15 @@ type sheetsClient struct {
 }
 
 type SheetsClientConfig struct {
-	SpreadsheetID    string
-	SheetName        string
-	ClientSecretPath string
-	OAuthTokenPath   string
+	Service       *sheets.Service
+	SpreadsheetID string
+	SheetName     string
 }
 
-func NewGoogleSheetsClient(ctx context.Context, cfg SheetsClientConfig) (*sheetsClient, error) {
-	srv, err := newSheetsService(ctx, cfg.ClientSecretPath, cfg.OAuthTokenPath)
-	if err != nil {
-		return nil, fmt.Errorf("error creating Google Sheets client: %v", err)
-	}
+func NewGoogleSheetsClient(cfg SheetsClientConfig) *sheetsClient {
 	// TODO(aerion): Escape this, in case the sheet name contains a single quote.
 	tableRange := fmt.Sprintf("'%s'!A1:E1", cfg.SheetName)
-	return &sheetsClient{srv, cfg.SpreadsheetID, tableRange}, nil
+	return &sheetsClient{cfg.Service, cfg.SpreadsheetID, tableRange}
 }
 
 func (c *sheetsClient) RecordDonation(ev donation.Event, bid bidwar.Choice) error {

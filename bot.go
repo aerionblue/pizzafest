@@ -13,6 +13,7 @@ import (
 	"github.com/aerionblue/pizzafest/bidwar"
 	"github.com/aerionblue/pizzafest/db"
 	"github.com/aerionblue/pizzafest/donation"
+	"github.com/aerionblue/pizzafest/googlesheets"
 	"github.com/aerionblue/pizzafest/streamlabs"
 )
 
@@ -107,17 +108,17 @@ func main() {
 	var donationPoller *streamlabs.DonationPoller
 	var bidwars bidwar.Collection
 	if *sheetsCredsPath != "" {
-		cfg := db.SheetsClientConfig{
-			SpreadsheetID:    spreadsheetID,
-			SheetName:        bidTrackerSheetName,
-			ClientSecretPath: *sheetsCredsPath,
-			OAuthTokenPath:   *sheetsTokenPath,
-		}
 		var err error
-		dbRecorder, err = db.NewGoogleSheetsClient(context.Background(), cfg)
+		sheetsSrv, err := googlesheets.NewService(context.Background(), *sheetsCredsPath, *sheetsTokenPath)
 		if err != nil {
-			log.Fatalf("error initializing Google Sheets client: %v", err)
+			log.Fatalf("error initializing Google Sheets API: %v", err)
 		}
+		cfg := db.SheetsClientConfig{
+			Service:       sheetsSrv,
+			SpreadsheetID: spreadsheetID,
+			SheetName:     bidTrackerSheetName,
+		}
+		dbRecorder = db.NewGoogleSheetsClient(cfg)
 	} else if *firestoreCredsPath != "" {
 		var err error
 		dbRecorder, err = db.NewFirestoreClient(context.Background(), *firestoreCredsPath)
