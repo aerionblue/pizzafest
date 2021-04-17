@@ -2,7 +2,9 @@ package bidwar
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 
@@ -75,6 +77,19 @@ func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 	return Choice{Option: minOpt, Reason: reasonString(reason, msg)}
 }
 
+// FindContest returns the Contest that contains an Option with the given
+// display name.
+func (c Collection) FindContest(displayName string) Contest {
+	for _, con := range c.Contests {
+		for _, opt := range con.Options {
+			if opt.DisplayName == displayName {
+				return con
+			}
+		}
+	}
+	return Contest{}
+}
+
 func reasonString(reason ChoiceReason, msg string) string {
 	if msg == "" {
 		return ""
@@ -124,14 +139,17 @@ type Total struct {
 
 // Tallier assigns donations to bid war options and reports bid totals.
 type Tallier struct {
-	sheetsSrv     *sheets.Service
-	spreadsheetID string
-	collection    Collection
+	sheetsSrv      *sheets.Service
+	spreadsheetID  string
+	donationsRange string
+	collection     Collection
 }
 
 // NewTallier creates a Tallier.
-func NewTallier(srv *sheets.Service, spreadsheetID string, collection Collection) *Tallier {
-	return &Tallier{srv, spreadsheetID, collection}
+func NewTallier(srv *sheets.Service, spreadsheetID string, sheetName string, collection Collection) *Tallier {
+	// TODO(aerion): Escape this, in case the sheet name contains a single quote.
+	donationsRange := fmt.Sprintf("'%s'!A:E", sheetName)
+	return &Tallier{srv, spreadsheetID, donationsRange, collection}
 }
 
 // GetTotals looks up the current total for each bid war Option. The totals
@@ -201,4 +219,111 @@ func (t Tallier) GetTotals() ([]Total, error) {
 		}
 	}
 	return totals, nil
+}
+
+// AssignFromMessage detects a donor's choice from a chat message, assigns the
+// donor's previous bids to the chosen Option, and returns the new totals for
+// the affected Contest. If the message does not correspond to a known Option,
+// returns nil.
+func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, error) {
+	if donor == "" {
+		return nil, errors.New("donor must not be empty")
+	}
+	choice := t.collection.ChoiceFromMessage(message, FromChatMessage)
+	if choice.Option.DisplayName == "" {
+		return nil, nil
+	}
+	contest := t.collection.FindContest(choice.Option.DisplayName)
+	if contest.Name == "" {
+		return nil, fmt.Errorf("could not find bid war contest for option %q", choice.Option.DisplayName)
+	}
+
+	valueRange, err := t.sheetsSrv.Spreadsheets.Values.
+		Get(t.spreadsheetID, t.donationsRange).
+		MajorDimension("ROWS").
+		ValueRenderOption("UNFORMATTED_VALUE").
+		Do()
+	if err != nil {
+		return nil, fmt.Errorf("error reading spreadsheet: %v", err)
+	}
+
+	vrToWrite := makeChoice(valueRange, donor, choice)
+
+	updateResp, err := t.sheetsSrv.Spreadsheets.Values.
+		Update(t.spreadsheetID, vrToWrite.Range, vrToWrite).
+		ValueInputOption("USER_ENTERED").
+		Do()
+	if err != nil {
+		return nil, fmt.Errorf("error updating spreadsheet: %v", err)
+	}
+	log.Printf("updated %d rows for %s for %s", updateResp.UpdatedRows, donor, choice.Option.DisplayName)
+
+	// TODO(aerion): Worth experimenting to see if there's a race between
+	// writing to the sheet and reading the totals after. We could just read
+	// first and then do the math locally.
+	totals, err := t.GetTotals()
+	if err != nil {
+		return nil, err
+	}
+	optsByName := make(map[string]Option)
+	for _, opt := range contest.Options {
+		optsByName[opt.DisplayName] = opt
+	}
+	var totalsForContest []Total
+	for _, tot := range totals {
+		if _, ok := optsByName[tot.Option.DisplayName]; ok {
+			totalsForContest = append(totalsForContest, tot)
+		}
+	}
+	return totalsForContest, nil
+}
+
+// makeChoice returns a new ValueRange representing values to be written to
+// the sheet in order to implement the given donor's choice. Specifically, for
+// each row where the "Contributor" column matches the donor and the "Choice"
+// column is not already set, the "Choice" and "Message" columns are set to
+// reflect the choice. All other values in the range are set to nil.
+func makeChoice(vr *sheets.ValueRange, donor string, choice Choice) *sheets.ValueRange {
+	newValues := make([][]interface{}, len(vr.Values))
+	for i, row := range vr.Values {
+		var newRow []interface{}
+		dr := donationRow(row)
+		if dr.Contributor() == donor && dr.Choice() == "" {
+			newRow = rowForChoice(choice.Option.DisplayName, choice.Reason)
+		} else {
+			newRow = []interface{}{}
+		}
+		newValues[i] = newRow
+	}
+
+	return &sheets.ValueRange{
+		MajorDimension: vr.MajorDimension,
+		Range:          vr.Range,
+		Values:         newValues,
+	}
+}
+
+// TODO(aerion): This is a little hacky for now. We could make this more
+// structured in the future if it needs to be more resistant to changes in
+// spreadsheet layout.
+type donationRow []interface{}
+
+func (d donationRow) Contributor() string {
+	return d.column(0)
+}
+
+func (d donationRow) Choice() string {
+	return d.column(3)
+}
+
+func (d donationRow) column(n int) string {
+	if n >= len(d) {
+		return ""
+	}
+	s, _ := d[n].(string)
+	return s
+}
+
+func rowForChoice(donor string, message string) donationRow {
+	return []interface{}{nil, nil, nil, donor, message}
 }

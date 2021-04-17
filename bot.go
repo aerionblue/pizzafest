@@ -132,7 +132,7 @@ func main() {
 			SheetName:     bidTrackerSheetName,
 		}
 		dbRecorder = db.NewGoogleSheetsClient(cfg)
-		bidwarTallier = bidwar.NewTallier(sheetsSrv, spreadsheetID, bidwars)
+		bidwarTallier = bidwar.NewTallier(sheetsSrv, spreadsheetID, bidTrackerSheetName, bidwars)
 		bidTotals, err := bidwarTallier.GetTotals()
 		if err != nil {
 			log.Fatalf("error reading current bid war totals: %v", err)
@@ -185,12 +185,20 @@ func main() {
 	if !*prod {
 		go func() {
 			<-time.After(2 * time.Second)
-			ircClient.Say(*targetChannel, "subgift --tier 2 --months 6 --username usedpizza --username2 AEWC20XX")
+			ircClient.Say(*targetChannel, "subgift --tier 2 --months 6 --username aerionblue --username2 AEWC20XX")
 			ircClient.Say(*targetChannel, "submysterygift --username usedpizza --count 3")
-			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 AEWC20XX")
+			ircClient.Say(*targetChannel, "subgift --username aerionblue --username2 AEWC20XX")
 			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 eldritchdildoes")
 			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 Mia_Khalifa")
 			ircClient.Say(*targetChannel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
+			log.Print("submitting !bid message...")
+			totals, err := bidwarTallier.AssignFromMessage("aerionblue", "!bid wind waker please")
+			if err != nil {
+				log.Fatal(err)
+			}
+			for _, t := range totals {
+				log.Printf("new total for %q is %0.2f", t.Option.DisplayName, float64(t.Cents)/100)
+			}
 		}()
 	}
 
