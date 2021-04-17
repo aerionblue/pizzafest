@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"sort"
 	"strconv"
 
 	"google.golang.org/api/sheets/v4"
@@ -136,6 +137,12 @@ type Total struct {
 	Option Option
 	Cents  int // The total number of US cents contributed towards this option.
 }
+
+type byCents []Total
+
+func (b byCents) Len() int           { return len(b) }
+func (b byCents) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b byCents) Less(i, j int) bool { return b[i].Cents < b[j].Cents }
 
 // Tallier assigns donations to bid war options and reports bid totals.
 type Tallier struct {
@@ -275,6 +282,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, error
 			totalsForContest = append(totalsForContest, tot)
 		}
 	}
+	sort.Sort(sort.Reverse(byCents(totalsForContest)))
 	return totalsForContest, nil
 }
 
