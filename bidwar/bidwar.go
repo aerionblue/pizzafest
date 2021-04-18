@@ -235,21 +235,16 @@ func (t Tallier) GetTotals() ([]Total, error) {
 	return totals, nil
 }
 
-// AssignFromMessage detects a donor's choice from a chat message, assigns the
-// donor's previous bids to the chosen Option, and returns the new totals for
-// the affected Contest. If the message does not correspond to a known Option,
-// returns nil.
-func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, UpdateStats, error) {
+// AssignFromMessage detects a donor's choice from a chat message and assigns
+// the donor's previous bids to the chosen Option. If the message does not
+// correspond to a known Option, returns the zero value (but no error).
+func (t Tallier) AssignFromMessage(donor string, message string) (UpdateStats, error) {
 	if donor == "" {
-		return nil, UpdateStats{}, errors.New("donor must not be empty")
+		return UpdateStats{}, errors.New("donor must not be empty")
 	}
 	choice := t.collection.ChoiceFromMessage(message, FromChatMessage)
 	if choice.Option.DisplayName == "" {
-		return nil, UpdateStats{}, nil
-	}
-	contest := t.collection.FindContest(choice.Option.DisplayName)
-	if contest.Name == "" {
-		return nil, UpdateStats{}, fmt.Errorf("could not find bid war contest for option %q", choice.Option.DisplayName)
+		return UpdateStats{}, nil
 	}
 
 	valueRange, err := t.sheetsSrv.Spreadsheets.Values.
@@ -258,7 +253,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, Updat
 		ValueRenderOption("UNFORMATTED_VALUE").
 		Do()
 	if err != nil {
-		return nil, UpdateStats{}, fmt.Errorf("error reading spreadsheet: %v", err)
+		return UpdateStats{}, fmt.Errorf("error reading spreadsheet: %v", err)
 	}
 
 	vrToWrite, matchedRows := makeChoice(valueRange, donor, choice)
@@ -269,17 +264,30 @@ func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, Updat
 			ValueInputOption("RAW").
 			Do()
 		if err != nil {
-			return nil, UpdateStats{}, fmt.Errorf("error updating spreadsheet: %v", err)
+			return UpdateStats{}, fmt.Errorf("error updating spreadsheet: %v", err)
 		}
 		log.Printf("updated %d rows for %s for %s", updateResp.UpdatedRows, donor, choice.Option.DisplayName)
 	}
 
-	// TODO(aerion): Worth experimenting to see if there's a race between
-	// writing to the sheet and reading the totals after. We could just read
-	// first and then do the math locally.
+	totalCents := 0
+	for _, dr := range matchedRows {
+		totalCents += dr.Cents()
+	}
+	updateStats := UpdateStats{
+		Option:     choice.Option,
+		Count:      len(matchedRows),
+		TotalCents: totalCents,
+	}
+
+	return updateStats, nil
+}
+
+// TotalsForContest returns the current bid war total for each Option in a
+// Contest, in descending order by value (i.e., the winning Option first).
+func (t Tallier) TotalsForContest(contest Contest) ([]Total, error) {
 	totals, err := t.GetTotals()
 	if err != nil {
-		return nil, UpdateStats{}, err
+		return nil, err
 	}
 	optsByName := make(map[string]Option)
 	for _, opt := range contest.Options {
@@ -292,18 +300,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, Updat
 		}
 	}
 	sort.Sort(sort.Reverse(byCents(totalsForContest)))
-
-	totalCents := 0
-	for _, dr := range matchedRows {
-		totalCents += dr.Cents()
-	}
-	updateStats := UpdateStats{
-		Option:     choice.Option,
-		Count:      len(matchedRows),
-		TotalCents: totalCents,
-	}
-
-	return totalsForContest, updateStats, nil
+	return totalsForContest, nil
 }
 
 // makeChoice decides which rows in the given ValueRange need to be edited in

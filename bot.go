@@ -63,10 +63,20 @@ func (b *bot) dispatchBitsEvent(ev donation.Event) {
 
 func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 	donor := m.User.Name
-	totals, updateStats, err := b.bidwarTallier.AssignFromMessage(donor, m.Message)
+	updateStats, err := b.bidwarTallier.AssignFromMessage(donor, m.Message)
 	if err != nil {
 		log.Printf("ERROR assigning bid command for %s", donor)
+		return
 	}
+	// TODO(aerion): Worth experimenting to see if there's a race between
+	// writing to the sheet and reading the totals after. We could just read
+	// first and then do the math locally.
+	totals, err := b.getNewTotals(updateStats.Option)
+	if err != nil {
+		log.Printf("ERROR reading new bid war totals: %v", err)
+		return
+	}
+
 	var totalStrs []string
 	for _, t := range totals {
 		totalStrs = append(totalStrs, fmt.Sprintf("%s: $%0.2f", t.Option.DisplayName, float64(t.Cents)/100))
@@ -106,6 +116,18 @@ func (b *bot) shouldIgnoreSubGift(ev donation.Event) bool {
 	return b.communityGifts[ev.Owner].Add(massGiftCooldown).After(time.Now())
 }
 
+func (b *bot) getNewTotals(opt bidwar.Option) ([]bidwar.Total, error) {
+	contest := b.bidwars.FindContest(opt.DisplayName)
+	if contest.Name == "" {
+		return nil, fmt.Errorf("could not find bid war for option %q", opt.DisplayName)
+	}
+	totals, err := b.bidwarTallier.TotalsForContest(contest)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching current bid war totals: %v", err)
+	}
+	return totals, nil
+}
+
 func (b *bot) reply(pm twitch.PrivateMessage, msg string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -127,14 +149,11 @@ func doLocalTest(channel string, ircClient *twitch.Client, tallier *bidwar.Talli
 	ircClient.Say(channel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
 	<-time.After(2 * time.Second)
 	log.Print("submitting !bid message...")
-	totals, updateStats, err := tallier.AssignFromMessage("aerionblue", "!bid wind waker please")
+	updateStats, err := tallier.AssignFromMessage("aerionblue", "!bid wind waker please")
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("assigned %d rows (%d cents) to %q", updateStats.Count, updateStats.TotalCents, updateStats.Option.DisplayName)
-	for _, t := range totals {
-		log.Printf("new total for %q is %0.2f", t.Option.DisplayName, float64(t.Cents)/100)
-	}
 }
 
 func main() {
