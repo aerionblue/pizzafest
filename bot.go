@@ -43,11 +43,7 @@ type bot struct {
 	lastChatTime   time.Time
 }
 
-func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
-	ev, ok := donation.ParseSubEvent(m)
-	if !ok {
-		return
-	}
+func (b *bot) dispatchSubEvent(ev donation.Event) {
 	if ev.Type == donation.CommunityGift {
 		b.updateCommunityGift(ev)
 	}
@@ -59,27 +55,27 @@ func (b *bot) dispatchUserNoticeMessage(m twitch.UserNoticeMessage) {
 	b.recordDonation(ev, bid)
 }
 
-func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
-	if ev, ok := donation.ParseBitsEvent(m); ok {
-		log.Printf("new bits donation by %v worth %d cents (bits: %d)", ev.Owner, ev.CentsValue(), ev.Bits)
-		bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromChatMessage)
-		b.recordDonation(ev, bid)
-	} else if strings.HasPrefix(m.Message, bidCommand) {
-		donor := m.User.Name
-		totals, updateStats, err := b.bidwarTallier.AssignFromMessage(donor, m.Message)
-		if err != nil {
-			log.Printf("ERROR assigning bid command for %s", donor)
-		}
-		var totalStrs []string
-		for _, t := range totals {
-			totalStrs = append(totalStrs, fmt.Sprintf("%s: $%0.2f", t.Option.DisplayName, float64(t.Cents)/100))
-		}
-		if updateStats.TotalCents > 0 {
-			b.reply(m, fmt.Sprintf("@%s: I put your $%.02f towards %s. New totals: %s",
-				donor, float64(updateStats.TotalCents)/100, updateStats.Option.DisplayName, strings.Join(totalStrs, ", ")))
-		} else {
-			b.reply(m, fmt.Sprintf("Totals: %s", strings.Join(totalStrs, ", ")))
-		}
+func (b *bot) dispatchBitsEvent(ev donation.Event) {
+	log.Printf("new bits donation by %v worth %d cents (bits: %d)", ev.Owner, ev.CentsValue(), ev.Bits)
+	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromChatMessage)
+	b.recordDonation(ev, bid)
+}
+
+func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
+	donor := m.User.Name
+	totals, updateStats, err := b.bidwarTallier.AssignFromMessage(donor, m.Message)
+	if err != nil {
+		log.Printf("ERROR assigning bid command for %s", donor)
+	}
+	var totalStrs []string
+	for _, t := range totals {
+		totalStrs = append(totalStrs, fmt.Sprintf("%s: $%0.2f", t.Option.DisplayName, float64(t.Cents)/100))
+	}
+	if updateStats.TotalCents > 0 {
+		b.reply(m, fmt.Sprintf("@%s: I put your $%.02f towards %s. New totals: %s",
+			donor, float64(updateStats.TotalCents)/100, updateStats.Option.DisplayName, strings.Join(totalStrs, ", ")))
+	} else {
+		b.reply(m, fmt.Sprintf("Totals: %s", strings.Join(totalStrs, ", ")))
 	}
 }
 
@@ -233,10 +229,16 @@ func main() {
 	}
 
 	ircClient.OnUserNoticeMessage(func(m twitch.UserNoticeMessage) {
-		b.dispatchUserNoticeMessage(m)
+		if ev, ok := donation.ParseSubEvent(m); ok {
+			b.dispatchSubEvent(ev)
+		}
 	})
 	ircClient.OnPrivateMessage(func(m twitch.PrivateMessage) {
-		b.dispatchPrivateMessage(m)
+		if ev, ok := donation.ParseBitsEvent(m); ok {
+			b.dispatchBitsEvent(ev)
+		} else if strings.HasPrefix(m.Message, bidCommand) {
+			b.dispatchBidCommand(m)
+		}
 	})
 	ircClient.Join(*targetChannel)
 
