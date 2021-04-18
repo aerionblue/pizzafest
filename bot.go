@@ -66,7 +66,7 @@ func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
 		b.recordDonation(ev, bid)
 	} else if strings.HasPrefix(m.Message, bidCommand) {
 		donor := m.User.Name
-		totals, err := b.bidwarTallier.AssignFromMessage(donor, m.Message)
+		totals, updateStats, err := b.bidwarTallier.AssignFromMessage(donor, m.Message)
 		if err != nil {
 			log.Printf("ERROR assigning bid command for %s", donor)
 		}
@@ -74,7 +74,12 @@ func (b *bot) dispatchPrivateMessage(m twitch.PrivateMessage) {
 		for _, t := range totals {
 			totalStrs = append(totalStrs, fmt.Sprintf("%s: $%0.2f", t.Option.DisplayName, float64(t.Cents)/100))
 		}
-		b.reply(m, fmt.Sprintf("New totals: %s", strings.Join(totalStrs, ", ")))
+		if updateStats.TotalCents > 0 {
+			b.reply(m, fmt.Sprintf("@%s: I put your $%.02f towards %s. New totals: %s",
+				donor, float64(updateStats.TotalCents)/100, updateStats.Option.DisplayName, strings.Join(totalStrs, ", ")))
+		} else {
+			b.reply(m, fmt.Sprintf("Totals: %s", strings.Join(totalStrs, ", ")))
+		}
 	}
 }
 
@@ -231,11 +236,13 @@ func main() {
 			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 eldritchdildoes")
 			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 Mia_Khalifa")
 			ircClient.Say(*targetChannel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
+			<-time.After(2 * time.Second)
 			log.Print("submitting !bid message...")
-			totals, err := bidwarTallier.AssignFromMessage("aerionblue", "!bid wind waker please")
+			totals, updateStats, err := bidwarTallier.AssignFromMessage("aerionblue", "!bid wind waker please")
 			if err != nil {
 				log.Fatal(err)
 			}
+			log.Printf("assigned %d rows (%d cents) to %q", updateStats.Count, updateStats.TotalCents, updateStats.Option.DisplayName)
 			for _, t := range totals {
 				log.Printf("new total for %q is %0.2f", t.Option.DisplayName, float64(t.Cents)/100)
 			}

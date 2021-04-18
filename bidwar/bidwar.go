@@ -144,6 +144,13 @@ func (b byCents) Len() int           { return len(b) }
 func (b byCents) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b byCents) Less(i, j int) bool { return b[i].Cents < b[j].Cents }
 
+// UpdateStats summarizes the changes made to a bid war.
+type UpdateStats struct {
+	Option     Option
+	Count      int
+	TotalCents int
+}
+
 // Tallier assigns donations to bid war options and reports bid totals.
 type Tallier struct {
 	sheetsSrv      *sheets.Service
@@ -232,17 +239,17 @@ func (t Tallier) GetTotals() ([]Total, error) {
 // donor's previous bids to the chosen Option, and returns the new totals for
 // the affected Contest. If the message does not correspond to a known Option,
 // returns nil.
-func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, error) {
+func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, UpdateStats, error) {
 	if donor == "" {
-		return nil, errors.New("donor must not be empty")
+		return nil, UpdateStats{}, errors.New("donor must not be empty")
 	}
 	choice := t.collection.ChoiceFromMessage(message, FromChatMessage)
 	if choice.Option.DisplayName == "" {
-		return nil, nil
+		return nil, UpdateStats{}, nil
 	}
 	contest := t.collection.FindContest(choice.Option.DisplayName)
 	if contest.Name == "" {
-		return nil, fmt.Errorf("could not find bid war contest for option %q", choice.Option.DisplayName)
+		return nil, UpdateStats{}, fmt.Errorf("could not find bid war contest for option %q", choice.Option.DisplayName)
 	}
 
 	valueRange, err := t.sheetsSrv.Spreadsheets.Values.
@@ -251,26 +258,28 @@ func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, error
 		ValueRenderOption("UNFORMATTED_VALUE").
 		Do()
 	if err != nil {
-		return nil, fmt.Errorf("error reading spreadsheet: %v", err)
+		return nil, UpdateStats{}, fmt.Errorf("error reading spreadsheet: %v", err)
 	}
 
-	vrToWrite := makeChoice(valueRange, donor, choice)
+	vrToWrite, matchedRows := makeChoice(valueRange, donor, choice)
 
-	updateResp, err := t.sheetsSrv.Spreadsheets.Values.
-		Update(t.spreadsheetID, vrToWrite.Range, vrToWrite).
-		ValueInputOption("USER_ENTERED").
-		Do()
-	if err != nil {
-		return nil, fmt.Errorf("error updating spreadsheet: %v", err)
+	if len(matchedRows) > 0 {
+		updateResp, err := t.sheetsSrv.Spreadsheets.Values.
+			Update(t.spreadsheetID, vrToWrite.Range, vrToWrite).
+			ValueInputOption("USER_ENTERED").
+			Do()
+		if err != nil {
+			return nil, UpdateStats{}, fmt.Errorf("error updating spreadsheet: %v", err)
+		}
+		log.Printf("updated %d rows for %s for %s", updateResp.UpdatedRows, donor, choice.Option.DisplayName)
 	}
-	log.Printf("updated %d rows for %s for %s", updateResp.UpdatedRows, donor, choice.Option.DisplayName)
 
 	// TODO(aerion): Worth experimenting to see if there's a race between
 	// writing to the sheet and reading the totals after. We could just read
 	// first and then do the math locally.
 	totals, err := t.GetTotals()
 	if err != nil {
-		return nil, err
+		return nil, UpdateStats{}, err
 	}
 	optsByName := make(map[string]Option)
 	for _, opt := range contest.Options {
@@ -283,32 +292,47 @@ func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, error
 		}
 	}
 	sort.Sort(sort.Reverse(byCents(totalsForContest)))
-	return totalsForContest, nil
+
+	totalCents := 0
+	for _, dr := range matchedRows {
+		totalCents += dr.Cents()
+	}
+	updateStats := UpdateStats{
+		Option:     choice.Option,
+		Count:      len(matchedRows),
+		TotalCents: totalCents,
+	}
+
+	return totalsForContest, updateStats, nil
 }
 
-// makeChoice returns a new ValueRange representing values to be written to
-// the sheet in order to implement the given donor's choice. Specifically, for
-// each row where the "Contributor" column matches the donor and the "Choice"
-// column is not already set, the "Choice" and "Message" columns are set to
-// reflect the choice. All other values in the range are set to nil.
-func makeChoice(vr *sheets.ValueRange, donor string, choice Choice) *sheets.ValueRange {
+// makeChoice decides which rows in the given ValueRange need to be edited in
+// order to implement the requested choice. It returns two values: a new
+// ValueRange describing how to update the spreadsheet, and a list of the
+// original values of the spreadsheet rows to be updated. We update each row
+// where the "Contributor" column matches the donor and the "Choice" column is
+// not already set.
+func makeChoice(vr *sheets.ValueRange, donor string, choice Choice) (*sheets.ValueRange, []donationRow) {
 	newValues := make([][]interface{}, len(vr.Values))
+	var updatedRows []donationRow
 	for i, row := range vr.Values {
 		var newRow []interface{}
 		dr := donationRow(row)
 		if dr.Contributor() == donor && dr.Choice() == "" {
 			newRow = rowForChoice(choice.Option.DisplayName, choice.Reason)
+			updatedRows = append(updatedRows, dr)
 		} else {
 			newRow = []interface{}{}
 		}
 		newValues[i] = newRow
 	}
-
-	return &sheets.ValueRange{
+	newVR := &sheets.ValueRange{
 		MajorDimension: vr.MajorDimension,
 		Range:          vr.Range,
 		Values:         newValues,
 	}
+
+	return newVR, updatedRows
 }
 
 // TODO(aerion): This is a little hacky for now. We could make this more
@@ -318,6 +342,25 @@ type donationRow []interface{}
 
 func (d donationRow) Contributor() string {
 	return d.column(0)
+}
+
+func (d donationRow) Cents() int {
+	if len(d) < 3 {
+		return 0
+	}
+
+	var cents int
+	switch v := d[2].(type) {
+	case string:
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0
+		}
+		cents = int(f * 100)
+	case float64:
+		cents = int(v * 100)
+	}
+	return cents
 }
 
 func (d donationRow) Choice() string {

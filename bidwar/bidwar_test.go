@@ -71,24 +71,46 @@ func TestMakeChoice(t *testing.T) {
 	choice := Choice{Option: Option{DisplayName: "Moo"}, Reason: "usedMoo"}
 
 	for _, tc := range []struct {
-		desc   string
-		donor  string
-		choice Choice
-		want   [][]interface{}
+		desc       string
+		donor      string
+		choice     Choice
+		wantValues [][]interface{}
+		wantRows   []donationRow
 	}{
-		{"updates one row", "AEWC20XX", choice, [][]interface{}{{}, {}, {nil, nil, nil, "Moo", "usedMoo"}, {}, {}}},
-		{"updates all empty rows for donor", "aerionblue", choice, [][]interface{}{{}, {nil, nil, nil, "Moo", "usedMoo"}, {}, {nil, nil, nil, "Moo", "usedMoo"}, {}}},
-		{"does not update header row", "Contributor", choice, [][]interface{}{{}, {}, {}, {}, {}}},
+		{
+			"updates one row",
+			"AEWC20XX",
+			choice,
+			[][]interface{}{{}, {}, {nil, nil, nil, "Moo", "usedMoo"}, {}, {}},
+			[]donationRow{vr.Values[2]},
+		},
+		{
+			"updates all empty rows for donor",
+			"aerionblue",
+			choice,
+			[][]interface{}{{}, {nil, nil, nil, "Moo", "usedMoo"}, {}, {nil, nil, nil, "Moo", "usedMoo"}, {}},
+			[]donationRow{vr.Values[1], vr.Values[3]},
+		},
+		{
+			"does not update header row",
+			"Contributor",
+			choice,
+			[][]interface{}{{}, {}, {}, {}, {}},
+			nil,
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			got := makeChoice(vr, tc.donor, tc.choice)
-			if got.Range != vr.Range {
-				t.Errorf("Range should be same as input: got %v, want %v", got.Range, vr.Range)
+			gotVR, gotRows := makeChoice(vr, tc.donor, tc.choice)
+			if gotVR.Range != vr.Range {
+				t.Errorf("Range should be same as input: got %v, want %v", gotVR.Range, vr.Range)
 			}
-			if got.MajorDimension != vr.MajorDimension {
-				t.Errorf("MajorDimension should be same as input: got %v, want %v", got.MajorDimension, vr.MajorDimension)
+			if gotVR.MajorDimension != vr.MajorDimension {
+				t.Errorf("MajorDimension should be same as input: got %v, want %v", gotVR.MajorDimension, vr.MajorDimension)
 			}
-			if diff := deep.Equal(got.Values, tc.want); diff != nil {
+			if diff := deep.Equal(gotVR.Values, tc.wantValues); diff != nil {
+				t.Error(diff)
+			}
+			if diff := deep.Equal(gotRows, tc.wantRows); diff != nil {
 				t.Error(diff)
 			}
 		})
