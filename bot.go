@@ -121,6 +121,26 @@ func (b *bot) reply(pm twitch.PrivateMessage, msg string) {
 	b.ircClient.Say(pm.Channel, msg)
 }
 
+func doLocalTest(channel string, ircClient *twitch.Client, tallier *bidwar.Tallier) {
+	<-time.After(2 * time.Second)
+	ircClient.Say(channel, "subgift --tier 2 --months 6 --username aerionblue --username2 AEWC20XX")
+	ircClient.Say(channel, "submysterygift --username usedpizza --count 3")
+	ircClient.Say(channel, "subgift --username aerionblue --username2 AEWC20XX")
+	ircClient.Say(channel, "subgift --username usedpizza --username2 eldritchdildoes")
+	ircClient.Say(channel, "subgift --username usedpizza --username2 Mia_Khalifa")
+	ircClient.Say(channel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
+	<-time.After(2 * time.Second)
+	log.Print("submitting !bid message...")
+	totals, updateStats, err := tallier.AssignFromMessage("aerionblue", "!bid wind waker please")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("assigned %d rows (%d cents) to %q", updateStats.Count, updateStats.TotalCents, updateStats.Option.DisplayName)
+	for _, t := range totals {
+		log.Printf("new total for %q is %0.2f", t.Option.DisplayName, float64(t.Cents)/100)
+	}
+}
+
 func main() {
 	prod := flag.Bool("prod", false, "Whether to use real twitch.tv IRC. If false, connects to fdgt instead.")
 	targetChannel := flag.String("channel", "aerionblue", "The IRC channel to listen to")
@@ -228,25 +248,7 @@ func main() {
 	}
 
 	if !*prod {
-		go func() {
-			<-time.After(2 * time.Second)
-			ircClient.Say(*targetChannel, "subgift --tier 2 --months 6 --username aerionblue --username2 AEWC20XX")
-			ircClient.Say(*targetChannel, "submysterygift --username usedpizza --count 3")
-			ircClient.Say(*targetChannel, "subgift --username aerionblue --username2 AEWC20XX")
-			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 eldritchdildoes")
-			ircClient.Say(*targetChannel, "subgift --username usedpizza --username2 Mia_Khalifa")
-			ircClient.Say(*targetChannel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
-			<-time.After(2 * time.Second)
-			log.Print("submitting !bid message...")
-			totals, updateStats, err := bidwarTallier.AssignFromMessage("aerionblue", "!bid wind waker please")
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Printf("assigned %d rows (%d cents) to %q", updateStats.Count, updateStats.TotalCents, updateStats.Option.DisplayName)
-			for _, t := range totals {
-				log.Printf("new total for %q is %0.2f", t.Option.DisplayName, float64(t.Cents)/100)
-			}
-		}()
+		go doLocalTest(*targetChannel, ircClient, bidwarTallier)
 	}
 
 	log.Print("connecting... ")
