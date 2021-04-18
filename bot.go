@@ -32,10 +32,11 @@ const chatCooldown = 5 * time.Second
 const massGiftCooldown = 5 * time.Second
 
 type bot struct {
-	ircClient     *twitch.Client
-	dbRecorder    db.Recorder
-	bidwars       bidwar.Collection
-	bidwarTallier *bidwar.Tallier
+	ircClient         *twitch.Client
+	ircRepliesEnabled bool
+	dbRecorder        db.Recorder
+	bidwars           bidwar.Collection
+	bidwarTallier     *bidwar.Tallier
 
 	mu sync.RWMutex
 	// Maps a Twitch username to the last time they gave a community gift sub.
@@ -136,10 +137,12 @@ func (b *bot) reply(pm twitch.PrivateMessage, msg string) {
 	}
 	b.lastChatTime = time.Now()
 	log.Printf("[-> #%v] %v", pm.Channel, msg)
-	b.ircClient.Say(pm.Channel, msg)
+	if b.ircRepliesEnabled {
+		b.ircClient.Say(pm.Channel, msg)
+	}
 }
 
-func doLocalTest(channel string, ircClient *twitch.Client, tallier *bidwar.Tallier) {
+func doLocalTest(b *bot, channel string, ircClient *twitch.Client, tallier *bidwar.Tallier) {
 	<-time.After(2 * time.Second)
 	ircClient.Say(channel, "subgift --tier 2 --months 6 --username aerionblue --username2 AEWC20XX")
 	ircClient.Say(channel, "submysterygift --username usedpizza --count 3")
@@ -148,12 +151,12 @@ func doLocalTest(channel string, ircClient *twitch.Client, tallier *bidwar.Talli
 	ircClient.Say(channel, "subgift --username usedpizza --username2 Mia_Khalifa")
 	ircClient.Say(channel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
 	<-time.After(2 * time.Second)
-	log.Print("submitting !bid message...")
-	updateStats, err := tallier.AssignFromMessage("aerionblue", "!bid wind waker please")
-	if err != nil {
-		log.Fatal(err)
+	pm := twitch.PrivateMessage{
+		User:    twitch.User{Name: "aerionblue"},
+		Type:    twitch.PRIVMSG,
+		Message: "!bid wind waker please",
 	}
-	log.Printf("assigned %d rows (%d cents) to %q", updateStats.Count, updateStats.TotalCents, updateStats.Option.DisplayName)
+	b.dispatchBidCommand(pm)
 }
 
 func main() {
@@ -168,6 +171,7 @@ func main() {
 	flag.Parse()
 
 	var ircClient *twitch.Client
+	var ircRepliesEnabled bool
 	if *prod {
 		log.Printf("*** CONNECTING TO PROD #%s ***", *targetChannel)
 		chatCreds, err := twitchchat.ParseCreds(*twitchChatCredsPath)
@@ -175,11 +179,13 @@ func main() {
 			log.Fatal(err)
 		}
 		ircClient = twitch.NewClient(chatCreds.Username, chatCreds.OAuthToken)
+		ircRepliesEnabled = true
 	} else {
 		log.Printf("--- connecting to fdgt #%s ---", *targetChannel)
 		ircClient = twitch.NewAnonymousClient()
 		ircClient.IrcAddress = testIRCAddress
 		ircClient.TLS = false
+		ircRepliesEnabled = false // Just echo replies to the log
 	}
 	ircClient.Capabilities = []string{twitch.CommandsCapability, twitch.TagsCapability}
 
@@ -240,11 +246,12 @@ func main() {
 	}
 
 	b := &bot{
-		ircClient:      ircClient,
-		dbRecorder:     dbRecorder,
-		bidwars:        bidwars,
-		bidwarTallier:  bidwarTallier,
-		communityGifts: make(map[string]time.Time),
+		ircClient:         ircClient,
+		ircRepliesEnabled: ircRepliesEnabled,
+		dbRecorder:        dbRecorder,
+		bidwars:           bidwars,
+		bidwarTallier:     bidwarTallier,
+		communityGifts:    make(map[string]time.Time),
 	}
 
 	ircClient.OnUserNoticeMessage(func(m twitch.UserNoticeMessage) {
@@ -269,7 +276,7 @@ func main() {
 	}
 
 	if !*prod {
-		go doLocalTest(*targetChannel, ircClient, bidwarTallier)
+		go doLocalTest(b, *targetChannel, ircClient, bidwarTallier)
 	}
 
 	log.Print("connecting... ")
