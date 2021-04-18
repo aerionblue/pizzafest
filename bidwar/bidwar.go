@@ -266,7 +266,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) ([]Total, Updat
 	if len(matchedRows) > 0 {
 		updateResp, err := t.sheetsSrv.Spreadsheets.Values.
 			Update(t.spreadsheetID, vrToWrite.Range, vrToWrite).
-			ValueInputOption("USER_ENTERED").
+			ValueInputOption("RAW").
 			Do()
 		if err != nil {
 			return nil, UpdateStats{}, fmt.Errorf("error updating spreadsheet: %v", err)
