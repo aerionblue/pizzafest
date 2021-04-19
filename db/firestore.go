@@ -33,11 +33,11 @@ func (c *firestoreClient) RecordDonation(ev donation.Event, bid bidwar.Choice) e
 	doc := donationDoc{
 		ISOTimestamp: c.now().UTC().Format(time.RFC3339Nano),
 		Owner:        ev.Owner,
-		Value:        ev.CentsValue(),
+		Value:        ev.Value().Cents(),
 		SubCount:     ev.SubCount,
 		SubTier:      ev.SubTier.Marshal(),
 		SubMonths:    ev.SubMonths,
-		Cents:        ev.Cents,
+		Cents:        ev.Cash.Cents(),
 		Bits:         ev.Bits,
 		BidwarChoice: bid.Option.DisplayName,
 	}

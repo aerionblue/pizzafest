@@ -72,7 +72,7 @@ func (d *DonationPoller) Start() error {
 	d.lastDonationID = lastID
 	log.Printf("starting Streamlabs polling for %s", username)
 	if len(evs) != 0 {
-		log.Printf("the last known donation is for $%0.2f from %s", float64(evs[0].CentsValue())/100, evs[0].Owner)
+		log.Printf("the last known donation is for $%s from %s", evs[0].Value(), evs[0].Owner)
 	}
 	go func() {
 		for {
@@ -207,7 +207,7 @@ func parseDonationResponse(raw []byte, twitchChannel string) ([]donation.Event, 
 		evs = append(evs, donation.Event{
 			Owner:   d.Donator,
 			Channel: twitchChannel,
-			Cents:   int(d.Dollars * 100),
+			Cash:    donation.CentsValue(int(d.Dollars * 100)),
 			Message: d.Message,
 		})
 		ids = append(ids, d.DonationID)

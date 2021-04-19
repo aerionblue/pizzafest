@@ -37,7 +37,7 @@ func (dt *DonationTable) Append(ev donation.Event, bidwarOption string, bidwarRe
 			{
 				ev.Owner,
 				ev.Description(),
-				fmt.Sprintf("%0.2f", float64(ev.CentsValue())/100),
+				ev.Value().String(),
 				bidwarOption,
 				bidwarReason,
 			},

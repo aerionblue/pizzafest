@@ -118,15 +118,15 @@ type Event struct {
 	// The number of bits donated.
 	Bits int
 	// The number of US cents donated.
-	Cents int
+	Cash CentsValue
 	// The chat message included with the event.
 	Message string
 }
 
 // CentsValue returns the value that this event should contribute to a bid war,
 // in US cents.
-func (e Event) CentsValue() int {
-	return subCentsValue*e.SubValue() + e.Bits + e.Cents
+func (e Event) Value() CentsValue {
+	return CentsValue(subCentsValue*e.SubValue() + e.Bits + e.Cash.Cents())
 }
 
 // SubValue returns this event's equivalent value in Tier 1 subscriptions.
@@ -139,8 +139,8 @@ func (e Event) Description() string {
 	// In practice, it's not possible for more than one of bits/dollars/subs
 	// to occur in the same Event, but we still handle it.
 	var parts []string
-	if e.Cents > 0 {
-		parts = append(parts, fmt.Sprintf("$%0.2f donation", float64(e.Cents)/100))
+	if e.Cash.Cents() > 0 {
+		parts = append(parts, fmt.Sprintf("$%s donation", e.Cash))
 	}
 	if e.Bits > 0 {
 		parts = append(parts, fmt.Sprintf("%d bits", e.Bits))
@@ -218,4 +218,16 @@ func ParseBitsEvent(m twitch.PrivateMessage) (Event, bool) {
 		return Event{}, false
 	}
 	return Event{Owner: m.User.Name, Channel: m.Channel, Bits: m.Bits, Message: m.Message}, true
+}
+
+// Value is the value of a donation.
+type CentsValue int
+
+// String expresses the value in dollars, without a currency symbol.
+func (v CentsValue) String() string {
+	return fmt.Sprintf("%0.2f", float64(v)/100)
+}
+
+func (v CentsValue) Cents() int {
+	return int(v)
 }

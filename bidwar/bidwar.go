@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/api/sheets/v4"
 
+	"github.com/aerionblue/pizzafest/donation"
 	"github.com/aerionblue/pizzafest/googlesheets"
 )
 
@@ -141,14 +142,14 @@ func Parse(rawJson []byte) (Collection, error) {
 // Total is the total money contributed towards the given bid war Option.
 type Total struct {
 	Option Option
-	Cents  int // The total number of US cents contributed towards this option.
+	Value  donation.CentsValue
 }
 
 type byCents []Total
 
 func (b byCents) Len() int           { return len(b) }
 func (b byCents) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-func (b byCents) Less(i, j int) bool { return b[i].Cents < b[j].Cents }
+func (b byCents) Less(i, j int) bool { return b[i].Value.Cents() < b[j].Value.Cents() }
 
 // Totals is a series of bid war Totals.
 type Totals []Total
@@ -156,7 +157,7 @@ type Totals []Total
 func (tt Totals) String() string {
 	var totalStrs []string
 	for _, t := range tt {
-		totalStrs = append(totalStrs, fmt.Sprintf("%s: $%0.2f", t.Option.DisplayName, float64(t.Cents)/100))
+		totalStrs = append(totalStrs, fmt.Sprintf("%s: $%s", t.Option.DisplayName, t.Value))
 	}
 	return strings.Join(totalStrs, ", ")
 }
@@ -165,7 +166,7 @@ func (tt Totals) String() string {
 type UpdateStats struct {
 	Option     Option
 	Count      int
-	TotalCents int
+	TotalValue donation.CentsValue
 }
 
 // Tallier assigns donations to bid war options and reports bid totals.
@@ -249,7 +250,7 @@ func (t Tallier) GetTotals() ([]Total, error) {
 			if err != nil {
 				return nil, fmt.Errorf("invalid total for %v: %v", n, v)
 			}
-			totals = append(totals, Total{Option: opt, Cents: int(dollars * 100)})
+			totals = append(totals, Total{Option: opt, Value: donation.CentsValue(int(dollars * 100))})
 		}
 	}
 	return totals, nil
@@ -288,7 +289,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) (UpdateStats, e
 	updateStats := UpdateStats{
 		Option:     choice.Option,
 		Count:      len(matchedRows),
-		TotalCents: totalCents,
+		TotalValue: donation.CentsValue(totalCents),
 	}
 
 	return updateStats, nil

@@ -51,7 +51,7 @@ func (b *bot) dispatchSubEvent(ev donation.Event) {
 	if ev.Type == donation.GiftSubscription && b.shouldIgnoreSubGift(ev) {
 		return
 	}
-	log.Printf("new subscription by %v worth %d cents (tier: %d, months: %d, count: %d)", ev.Owner, ev.CentsValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
+	log.Printf("new subscription by %v worth $%s (tier: %d, months: %d, count: %d)", ev.Owner, ev.Value(), ev.SubTier, ev.SubMonths, ev.SubCount)
 	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromSubMessage)
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
@@ -66,7 +66,7 @@ func (b *bot) dispatchSubEvent(ev donation.Event) {
 }
 
 func (b *bot) dispatchBitsEvent(ev donation.Event) {
-	log.Printf("new bits donation by %v worth %d cents (bits: %d)", ev.Owner, ev.CentsValue(), ev.Bits)
+	log.Printf("new bits donation by %v worth $%s (bits: %d)", ev.Owner, ev.Value(), ev.Bits)
 	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromChatMessage)
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
@@ -89,16 +89,16 @@ func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 			return
 		}
 		var msg string
-		if updateStats.TotalCents > 0 {
-			msg = fmt.Sprintf("@%s: I put your $%.02f towards %s.",
-				donor, float64(updateStats.TotalCents)/100, updateStats.Option.DisplayName)
+		if updateStats.TotalValue.Cents() > 0 {
+			msg = fmt.Sprintf("@%s: I put your $%s towards %s.",
+				donor, updateStats.TotalValue, updateStats.Option.DisplayName)
 		}
 		b.sayWithTotals(m.Channel, updateStats.Option, msg)
 	}()
 }
 
 func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
-	log.Printf("new streamlabs donation by %v worth %d cents (cents: %d)", ev.Owner, ev.CentsValue(), ev.Cents)
+	log.Printf("new streamlabs donation by %v worth $%s (cash: %s)", ev.Owner, ev.Value(), ev.Cash)
 	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromDonationMessage)
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
@@ -108,8 +108,8 @@ func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
 		b.sayWithTotals(
 			ev.Channel,
 			bid.Option,
-			fmt.Sprintf("$%.02f donation from %s put towards %s.",
-				float64(ev.CentsValue())/100, ev.Owner, bid.Option.DisplayName))
+			fmt.Sprintf("$%s donation from %s put towards %s.",
+				ev.Value(), ev.Owner, bid.Option.DisplayName))
 	}()
 }
 
@@ -249,7 +249,7 @@ func main() {
 		}
 		log.Printf("found %d bid war options in the database", len(bidTotals))
 		for _, bt := range bidTotals {
-			log.Printf("Current total for %q is %v cents", bt.Option.DisplayName, bt.Cents)
+			log.Printf("Current total for %q is %s", bt.Option.DisplayName, bt.Value)
 		}
 	} else if *firestoreCredsPath != "" {
 		var err error
