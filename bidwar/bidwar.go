@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 
 	"google.golang.org/api/sheets/v4"
 
@@ -77,6 +78,9 @@ func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 			}
 		}
 	}
+	if minIndex < 0 {
+		return Choice{}
+	}
 	return Choice{Option: minOpt, Reason: reasonString(reason, msg)}
 }
 
@@ -145,6 +149,17 @@ type byCents []Total
 func (b byCents) Len() int           { return len(b) }
 func (b byCents) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b byCents) Less(i, j int) bool { return b[i].Cents < b[j].Cents }
+
+// Totals is a series of bid war Totals.
+type Totals []Total
+
+func (tt Totals) String() string {
+	var totalStrs []string
+	for _, t := range tt {
+		totalStrs = append(totalStrs, fmt.Sprintf("%s: $%0.2f", t.Option.DisplayName, float64(t.Cents)/100))
+	}
+	return strings.Join(totalStrs, ", ")
+}
 
 // UpdateStats summarizes the changes made to a bid war.
 type UpdateStats struct {
@@ -281,7 +296,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) (UpdateStats, e
 
 // TotalsForContest returns the current bid war total for each Option in a
 // Contest, in descending order by value (i.e., the winning Option first).
-func (t Tallier) TotalsForContest(contest Contest) ([]Total, error) {
+func (t Tallier) TotalsForContest(contest Contest) (Totals, error) {
 	totals, err := t.GetTotals()
 	if err != nil {
 		return nil, err

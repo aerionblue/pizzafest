@@ -101,14 +101,19 @@ func parseSubTier(s string) SubTier {
 }
 
 type Event struct {
-	Type SubEventType
-	// Twitch username of the user who gets credit for this sub.
+	// Twitch username of the user who gets credit for this donation.
 	Owner string
-	// The number of subscriptions. Equal to 1 for regular subs and resubs. Can be more than 1 when multiple subs are gifted at once.
+	// Twitch channel to which this donation was given.
+	Channel string
+	// The type of subscription (if this event is a sub event).
+	Type SubEventType
+	// The number of subscriptions. Equal to 1 for regular subs and resubs. Can
+	// be more than 1 when multiple subs are gifted at once.
 	SubCount int
 	// The subscription tier.
 	SubTier SubTier
-	// How many months were purchased at once. Used for multi-month gifts. Equal to 1 for non-gifted subs.
+	// How many months were purchased at once. Used for multi-month gifts. Equal
+	// to 1 for non-gifted subs.
 	SubMonths int
 	// The number of bits donated.
 	Bits int
@@ -166,7 +171,11 @@ func ParseSubEvent(m twitch.UserNoticeMessage) (Event, bool) {
 		return Event{}, false
 	}
 
-	ev := Event{Type: eventType, Owner: m.User.Name, SubCount: 1, SubMonths: 1, Message: m.Message}
+	ev := Event{
+		Owner: m.User.Name, Channel: m.Channel,
+		Type: eventType, SubCount: 1, SubMonths: 1,
+		Message: m.Message,
+	}
 	for name, value := range m.MsgParams {
 		switch name {
 		case msgParamSubPlan:
@@ -208,5 +217,5 @@ func ParseBitsEvent(m twitch.PrivateMessage) (Event, bool) {
 	if m.Bits <= 0 {
 		return Event{}, false
 	}
-	return Event{Owner: m.User.Name, Bits: m.Bits, Message: m.Message}, true
+	return Event{Owner: m.User.Name, Channel: m.Channel, Bits: m.Bits, Message: m.Message}, true
 }

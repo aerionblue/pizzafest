@@ -30,20 +30,20 @@ func TestParseDonationResponse(t *testing.T) {
 			"one donation",
 			makeJsonResp(donationJson1),
 			[]int{1000},
-			[]donation.Event{{Owner: "ShartyMcFly", Cents: 1100, Message: "team mid"}},
+			[]donation.Event{{Owner: "ShartyMcFly", Channel: "testing", Cents: 1100, Message: "team mid"}},
 		},
 		{
 			"two donations",
 			makeJsonResp(donationJson2, donationJson1),
 			[]int{1000, 2000},
 			[]donation.Event{
-				{Owner: "ShartyMcFly", Cents: 1100, Message: "team mid"},
-				{Owner: "Konagami", Cents: 10000, Message: "team left"},
+				{Owner: "ShartyMcFly", Channel: "testing", Cents: 1100, Message: "team mid"},
+				{Owner: "Konagami", Channel: "testing", Cents: 10000, Message: "team left"},
 			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			evs, ids, err := parseDonationResponse([]byte(tc.jsonResp))
+			evs, ids, err := parseDonationResponse([]byte(tc.jsonResp), "testing")
 			if err != nil {
 				t.Errorf("error parsing json: %v", err)
 			}

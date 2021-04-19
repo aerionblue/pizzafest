@@ -53,13 +53,31 @@ func (b *bot) dispatchSubEvent(ev donation.Event) {
 	}
 	log.Printf("new subscription by %v worth %d cents (tier: %d, months: %d, count: %d)", ev.Owner, ev.CentsValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
 	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromSubMessage)
-	go b.recordDonation(ev, bid)
+	go func() {
+		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
+			log.Printf("ERROR writing donation to db: %v", err)
+			return
+		}
+		b.sayWithTotals(
+			ev.Channel,
+			bid.Option,
+			fmt.Sprintf("@%s: I put your sub towards %s.", ev.Owner, bid.Option.DisplayName))
+	}()
 }
 
 func (b *bot) dispatchBitsEvent(ev donation.Event) {
 	log.Printf("new bits donation by %v worth %d cents (bits: %d)", ev.Owner, ev.CentsValue(), ev.Bits)
 	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromChatMessage)
-	go b.recordDonation(ev, bid)
+	go func() {
+		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
+			log.Printf("ERROR writing donation to db: %v", err)
+			return
+		}
+		b.sayWithTotals(
+			ev.Channel,
+			bid.Option,
+			fmt.Sprintf("@%s: I put your bits towards %s.", ev.Owner, bid.Option.DisplayName))
+	}()
 }
 
 func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
@@ -70,38 +88,29 @@ func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 			log.Printf("ERROR assigning bid command for %s", donor)
 			return
 		}
-		// TODO(aerion): Worth experimenting to see if there's a race between
-		// writing to the sheet and reading the totals after. We could just read
-		// first and then do the math locally.
-		totals, err := b.getNewTotals(updateStats.Option)
-		if err != nil {
-			log.Printf("ERROR reading new bid war totals: %v", err)
-			return
-		}
-
-		var totalStrs []string
-		for _, t := range totals {
-			totalStrs = append(totalStrs, fmt.Sprintf("%s: $%0.2f", t.Option.DisplayName, float64(t.Cents)/100))
-		}
+		var msg string
 		if updateStats.TotalCents > 0 {
-			b.reply(m, fmt.Sprintf("@%s: I put your $%.02f towards %s. New totals: %s",
-				donor, float64(updateStats.TotalCents)/100, updateStats.Option.DisplayName, strings.Join(totalStrs, ", ")))
-		} else {
-			b.reply(m, fmt.Sprintf("Totals: %s", strings.Join(totalStrs, ", ")))
+			msg = fmt.Sprintf("@%s: I put your $%.02f towards %s.",
+				donor, float64(updateStats.TotalCents)/100, updateStats.Option.DisplayName)
 		}
+		b.sayWithTotals(m.Channel, updateStats.Option, msg)
 	}()
 }
 
 func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
 	log.Printf("new streamlabs donation by %v worth %d cents (cents: %d)", ev.Owner, ev.CentsValue(), ev.Cents)
 	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromDonationMessage)
-	go b.recordDonation(ev, bid)
-}
-
-func (b *bot) recordDonation(ev donation.Event, bid bidwar.Choice) {
-	if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
-		log.Printf("ERROR writing donation to db: %v", err)
-	}
+	go func() {
+		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
+			log.Printf("ERROR writing donation to db: %v", err)
+			return
+		}
+		b.sayWithTotals(
+			ev.Channel,
+			bid.Option,
+			fmt.Sprintf("$%.02f donation from %s put towards %s.",
+				float64(ev.CentsValue())/100, ev.Owner, bid.Option.DisplayName))
+	}()
 }
 
 func (b *bot) updateCommunityGift(ev donation.Event) {
@@ -119,7 +128,7 @@ func (b *bot) shouldIgnoreSubGift(ev donation.Event) bool {
 	return b.communityGifts[ev.Owner].Add(massGiftCooldown).After(time.Now())
 }
 
-func (b *bot) getNewTotals(opt bidwar.Option) ([]bidwar.Total, error) {
+func (b *bot) getNewTotals(opt bidwar.Option) (bidwar.Totals, error) {
 	contest := b.bidwars.FindContest(opt.DisplayName)
 	if contest.Name == "" {
 		return nil, fmt.Errorf("could not find bid war for option %q", opt.DisplayName)
@@ -131,17 +140,34 @@ func (b *bot) getNewTotals(opt bidwar.Option) ([]bidwar.Total, error) {
 	return totals, nil
 }
 
-func (b *bot) reply(pm twitch.PrivateMessage, msg string) {
+func (b *bot) say(channel string, msg string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.lastChatTime.Add(chatCooldown).After(time.Now()) {
+		log.Printf("[on cooldown for #%v] %v", channel, msg)
 		return
 	}
+	log.Printf("[-> #%v] %v", channel, msg)
 	b.lastChatTime = time.Now()
-	log.Printf("[-> #%v] %v", pm.Channel, msg)
 	if b.ircRepliesEnabled {
-		b.ircClient.Say(pm.Channel, msg)
+		b.ircClient.Say(channel, msg)
 	}
+}
+
+func (b *bot) sayWithTotals(channel string, opt bidwar.Option, msgPrefix string) {
+	if opt.DisplayName == "" {
+		return
+	}
+	totals, err := b.getNewTotals(opt)
+	if err != nil {
+		log.Printf("ERROR reading new bid war totals: %v", err)
+		return
+	}
+	msg := fmt.Sprintf("Totals: %s", totals.String())
+	if msgPrefix != "" {
+		msg = msgPrefix + " " + msg
+	}
+	b.say(channel, msg)
 }
 
 func doLocalTest(b *bot, channel string, ircClient *twitch.Client, tallier *bidwar.Tallier) {
@@ -156,6 +182,7 @@ func doLocalTest(b *bot, channel string, ircClient *twitch.Client, tallier *bidw
 	pm := twitch.PrivateMessage{
 		User:    twitch.User{Name: "aerionblue"},
 		Type:    twitch.PRIVMSG,
+		Channel: "testing",
 		Message: "!bid wind waker please",
 	}
 	b.dispatchBidCommand(pm)
@@ -235,7 +262,7 @@ func main() {
 	}
 	if *streamlabsCredsPath != "" {
 		var err error
-		donationPoller, err = streamlabs.NewDonationPoller(context.Background(), *streamlabsCredsPath)
+		donationPoller, err = streamlabs.NewDonationPoller(context.Background(), *streamlabsCredsPath, *targetChannel)
 		if err != nil {
 			log.Printf("(non-fatal) error initializing Streamlabs polling: %v", err)
 		}

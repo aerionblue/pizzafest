@@ -22,8 +22,10 @@ const donationBaseUrl = "https://streamlabs.com/api/v1.0/donations"
 const userInfoBaseUrl = "https://streamlabs.com/api/v1.0/user"
 
 type DonationPoller struct {
-	ticker *time.Ticker
-	stop   chan interface{}
+	// The Twitch channel towards which these donations are being made.
+	twitchChannel string
+	ticker        *time.Ticker
+	stop          chan interface{}
 
 	accessToken      string
 	lastDonationID   int
@@ -31,15 +33,19 @@ type DonationPoller struct {
 }
 
 // NewDonationPoller creates a DonationPoller that calls the provided callback once for each donation.
-func NewDonationPoller(ctx context.Context, credsPath string) (*DonationPoller, error) {
+func NewDonationPoller(ctx context.Context, credsPath string, twitchChannel string) (*DonationPoller, error) {
 	accessToken, err := parseCreds(credsPath)
 	if err != nil {
 		return nil, err
 	}
 	d := &DonationPoller{
-		ticker:      time.NewTicker(pollInterval),
-		stop:        make(chan interface{}),
-		accessToken: accessToken,
+		// We could query Streamlabs for the Twitch channel associated with the
+		// account, but it's not necessarily the same as the channel we are
+		// operating in (especially when testing).
+		twitchChannel: twitchChannel,
+		ticker:        time.NewTicker(pollInterval),
+		stop:          make(chan interface{}),
+		accessToken:   accessToken,
 	}
 	return d, nil
 }
@@ -154,7 +160,7 @@ func (d *DonationPoller) doDonationRequest(limit int, lastID int) ([]donation.Ev
 	if err != nil {
 		return nil, 0, fmt.Errorf("error reading Streamlabs response: %v", err)
 	}
-	evs, ids, err := parseDonationResponse(raw)
+	evs, ids, err := parseDonationResponse(raw, d.twitchChannel)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error parsing Streamlabs response: %v", err)
 	}
@@ -182,7 +188,9 @@ func parseUserResponse(raw []byte) (string, error) {
 
 // parseDonationResponse parses the JSON response, returning a list of events
 // in chronological order and a corresponding list of donation IDs.
-func parseDonationResponse(raw []byte) ([]donation.Event, []int, error) {
+func parseDonationResponse(raw []byte, twitchChannel string) ([]donation.Event, []int, error) {
+	// TODO(aerion): Give this function a DonationPoller receiver instead of
+	// passing the Twitch channel by argument.
 	var dr donationResponse
 	err := json.Unmarshal(raw, &dr)
 	if err != nil {
@@ -198,6 +206,7 @@ func parseDonationResponse(raw []byte) ([]donation.Event, []int, error) {
 		d := dr.Donations[i]
 		evs = append(evs, donation.Event{
 			Owner:   d.Donator,
+			Channel: twitchChannel,
 			Cents:   int(d.Dollars * 100),
 			Message: d.Message,
 		})
