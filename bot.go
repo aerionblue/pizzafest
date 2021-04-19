@@ -306,7 +306,7 @@ func main() {
 		go doLocalTest(b, *targetChannel, ircClient, bidwarTallier)
 	}
 
-	log.Print("connecting... ")
+	log.Print("connecting to IRC...")
 	if err := ircClient.Connect(); err != nil {
 		panic(err)
 	}
