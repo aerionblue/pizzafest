@@ -19,6 +19,7 @@ import (
 
 const pollInterval = 30 * time.Second
 const donationBaseUrl = "https://streamlabs.com/api/v1.0/donations"
+const userInfoBaseUrl = "https://streamlabs.com/api/v1.0/user"
 
 type DonationPoller struct {
 	ticker *time.Ticker
@@ -52,12 +53,18 @@ func (d *DonationPoller) Start() error {
 	if d.donationCallback == nil {
 		panic("non-nil donation callback must be provided to OnDonation before calling Start")
 	}
+	username, err := d.doUserRequest()
+	if err != nil {
+		return err
+	} else if username == "" {
+		return errors.New("could not find Streamlabs username")
+	}
 	evs, lastID, err := d.doDonationRequest(1, 0)
 	if err != nil {
 		return err
 	}
 	d.lastDonationID = lastID
-	log.Print("starting Streamlabs polling")
+	log.Printf("starting Streamlabs polling for %s", username)
 	if len(evs) != 0 {
 		log.Printf("the last known donation is for $%0.2f from %s", float64(evs[0].CentsValue())/100, evs[0].Owner)
 	}
@@ -96,9 +103,35 @@ func (d *DonationPoller) poll() {
 	}
 }
 
+// doUserRequest fetches the username of the Streamlabs account.
+func (d *DonationPoller) doUserRequest() (string, error) {
+	u, err := url.Parse(userInfoBaseUrl)
+	if err != nil {
+		panic(err)
+	}
+	q := u.Query()
+	q.Set("access_token", d.accessToken)
+	u.RawQuery = q.Encode()
+
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return "", fmt.Errorf("error fetching Streamlabs user info: %v", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading Streamlabs response: %v", err)
+	}
+	username, err := parseUserResponse(raw)
+	if err != nil {
+		return "", fmt.Errorf("error parsing Streamlabs response: %v", err)
+	}
+	return username, nil
+}
+
 // doDonationRequest fetches donations from Streamlabs. It returns the parsed
 // donations in chronological order, and the ID of the most recent donation.
-func (d DonationPoller) doDonationRequest(limit int, lastID int) ([]donation.Event, int, error) {
+func (d *DonationPoller) doDonationRequest(limit int, lastID int) ([]donation.Event, int, error) {
 	u, err := url.Parse(donationBaseUrl)
 	if err != nil {
 		panic(err)
@@ -123,12 +156,28 @@ func (d DonationPoller) doDonationRequest(limit int, lastID int) ([]donation.Eve
 	}
 	evs, ids, err := parseDonationResponse(raw)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("error parsing Streamlabs response: %v", err)
 	}
 	if len(evs) == 0 {
 		return nil, lastID, nil
 	}
 	return evs, ids[len(ids)-1], nil
+}
+
+type userResponse struct {
+	Streamlabs struct {
+		Id          int
+		DisplayName string `json:"display_name"`
+	}
+}
+
+func parseUserResponse(raw []byte) (string, error) {
+	var ur userResponse
+	err := json.Unmarshal(raw, &ur)
+	if err != nil {
+		return "", err
+	}
+	return ur.Streamlabs.DisplayName, nil
 }
 
 // parseDonationResponse parses the JSON response, returning a list of events
@@ -137,7 +186,7 @@ func parseDonationResponse(raw []byte) ([]donation.Event, []int, error) {
 	var dr donationResponse
 	err := json.Unmarshal(raw, &dr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error parsing Streamlabs response: %v", err)
+		return nil, nil, err
 	}
 	if len(dr.Donations) == 0 {
 		return nil, nil, nil

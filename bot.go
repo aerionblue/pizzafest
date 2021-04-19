@@ -270,7 +270,9 @@ func main() {
 		donationPoller.OnDonation(func(ev donation.Event) {
 			b.dispatchStreamlabsDonation(ev)
 		})
-		donationPoller.Start()
+		if err := donationPoller.Start(); err != nil {
+			log.Fatalf("Streamlabs polling error: %v", err)
+		}
 	}
 
 	if !*prod {
