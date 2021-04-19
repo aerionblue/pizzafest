@@ -163,7 +163,7 @@ func (b *bot) sayWithTotals(channel string, opt bidwar.Option, msgPrefix string)
 		log.Printf("ERROR reading new bid war totals: %v", err)
 		return
 	}
-	msg := fmt.Sprintf("Totals: %s", totals.String())
+	msg := totals.String()
 	if msgPrefix != "" {
 		msg = msgPrefix + " " + msg
 	}
