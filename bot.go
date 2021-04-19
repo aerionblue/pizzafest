@@ -53,47 +53,49 @@ func (b *bot) dispatchSubEvent(ev donation.Event) {
 	}
 	log.Printf("new subscription by %v worth %d cents (tier: %d, months: %d, count: %d)", ev.Owner, ev.CentsValue(), ev.SubTier, ev.SubMonths, ev.SubCount)
 	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromSubMessage)
-	b.recordDonation(ev, bid)
+	go b.recordDonation(ev, bid)
 }
 
 func (b *bot) dispatchBitsEvent(ev donation.Event) {
 	log.Printf("new bits donation by %v worth %d cents (bits: %d)", ev.Owner, ev.CentsValue(), ev.Bits)
 	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromChatMessage)
-	b.recordDonation(ev, bid)
+	go b.recordDonation(ev, bid)
 }
 
 func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
-	donor := m.User.Name
-	updateStats, err := b.bidwarTallier.AssignFromMessage(donor, m.Message)
-	if err != nil {
-		log.Printf("ERROR assigning bid command for %s", donor)
-		return
-	}
-	// TODO(aerion): Worth experimenting to see if there's a race between
-	// writing to the sheet and reading the totals after. We could just read
-	// first and then do the math locally.
-	totals, err := b.getNewTotals(updateStats.Option)
-	if err != nil {
-		log.Printf("ERROR reading new bid war totals: %v", err)
-		return
-	}
+	go func() {
+		donor := m.User.Name
+		updateStats, err := b.bidwarTallier.AssignFromMessage(donor, m.Message)
+		if err != nil {
+			log.Printf("ERROR assigning bid command for %s", donor)
+			return
+		}
+		// TODO(aerion): Worth experimenting to see if there's a race between
+		// writing to the sheet and reading the totals after. We could just read
+		// first and then do the math locally.
+		totals, err := b.getNewTotals(updateStats.Option)
+		if err != nil {
+			log.Printf("ERROR reading new bid war totals: %v", err)
+			return
+		}
 
-	var totalStrs []string
-	for _, t := range totals {
-		totalStrs = append(totalStrs, fmt.Sprintf("%s: $%0.2f", t.Option.DisplayName, float64(t.Cents)/100))
-	}
-	if updateStats.TotalCents > 0 {
-		b.reply(m, fmt.Sprintf("@%s: I put your $%.02f towards %s. New totals: %s",
-			donor, float64(updateStats.TotalCents)/100, updateStats.Option.DisplayName, strings.Join(totalStrs, ", ")))
-	} else {
-		b.reply(m, fmt.Sprintf("Totals: %s", strings.Join(totalStrs, ", ")))
-	}
+		var totalStrs []string
+		for _, t := range totals {
+			totalStrs = append(totalStrs, fmt.Sprintf("%s: $%0.2f", t.Option.DisplayName, float64(t.Cents)/100))
+		}
+		if updateStats.TotalCents > 0 {
+			b.reply(m, fmt.Sprintf("@%s: I put your $%.02f towards %s. New totals: %s",
+				donor, float64(updateStats.TotalCents)/100, updateStats.Option.DisplayName, strings.Join(totalStrs, ", ")))
+		} else {
+			b.reply(m, fmt.Sprintf("Totals: %s", strings.Join(totalStrs, ", ")))
+		}
+	}()
 }
 
 func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
 	log.Printf("new streamlabs donation by %v worth %d cents (cents: %d)", ev.Owner, ev.CentsValue(), ev.Cents)
 	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromDonationMessage)
-	b.recordDonation(ev, bid)
+	go b.recordDonation(ev, bid)
 }
 
 func (b *bot) recordDonation(ev donation.Event, bid bidwar.Choice) {
@@ -211,13 +213,9 @@ func main() {
 		if err != nil {
 			log.Fatalf("error initializing Google Sheets API: %v", err)
 		}
-		cfg := db.SheetsClientConfig{
-			Service:       sheetsSrv,
-			SpreadsheetID: spreadsheetID,
-			SheetName:     bidTrackerSheetName,
-		}
-		dbRecorder = db.NewGoogleSheetsClient(cfg)
-		bidwarTallier = bidwar.NewTallier(sheetsSrv, spreadsheetID, bidTrackerSheetName, bidwars)
+		donationTable := googlesheets.NewDonationTable(sheetsSrv, spreadsheetID, bidTrackerSheetName)
+		dbRecorder = db.NewGoogleSheetsClient(donationTable)
+		bidwarTallier = bidwar.NewTallier(sheetsSrv, donationTable, spreadsheetID, bidwars)
 		bidTotals, err := bidwarTallier.GetTotals()
 		if err != nil {
 			log.Fatalf("error reading current bid war totals: %v", err)

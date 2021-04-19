@@ -10,6 +10,8 @@ import (
 	"strconv"
 
 	"google.golang.org/api/sheets/v4"
+
+	"github.com/aerionblue/pizzafest/googlesheets"
 )
 
 // Google Sheets developer metadata keys. The target spreadsheet must contain
@@ -153,17 +155,20 @@ type UpdateStats struct {
 
 // Tallier assigns donations to bid war options and reports bid totals.
 type Tallier struct {
-	sheetsSrv      *sheets.Service
-	spreadsheetID  string
-	donationsRange string
-	collection     Collection
+	sheetsSrv     *sheets.Service
+	table         *googlesheets.DonationTable
+	spreadsheetID string
+	collection    Collection
 }
 
 // NewTallier creates a Tallier.
-func NewTallier(srv *sheets.Service, spreadsheetID string, sheetName string, collection Collection) *Tallier {
-	// TODO(aerion): Escape this, in case the sheet name contains a single quote.
-	donationsRange := fmt.Sprintf("'%s'!A:E", sheetName)
-	return &Tallier{srv, spreadsheetID, donationsRange, collection}
+func NewTallier(srv *sheets.Service, table *googlesheets.DonationTable, spreadsheetID string, collection Collection) *Tallier {
+	return &Tallier{
+		sheetsSrv:     srv,
+		table:         table,
+		spreadsheetID: spreadsheetID,
+		collection:    collection,
+	}
 }
 
 // GetTotals looks up the current total for each bid war Option. The totals
@@ -246,27 +251,19 @@ func (t Tallier) AssignFromMessage(donor string, message string) (UpdateStats, e
 	if choice.Option.DisplayName == "" {
 		return UpdateStats{}, nil
 	}
-
-	valueRange, err := t.sheetsSrv.Spreadsheets.Values.
-		Get(t.spreadsheetID, t.donationsRange).
-		MajorDimension("ROWS").
-		ValueRenderOption("UNFORMATTED_VALUE").
-		Do()
+	valueRange, err := t.table.GetTable()
 	if err != nil {
-		return UpdateStats{}, fmt.Errorf("error reading spreadsheet: %v", err)
+		return UpdateStats{}, fmt.Errorf("error reading donation table: %v", err)
 	}
 
 	vrToWrite, matchedRows := makeChoice(valueRange, donor, choice)
 
 	if len(matchedRows) > 0 {
-		updateResp, err := t.sheetsSrv.Spreadsheets.Values.
-			Update(t.spreadsheetID, vrToWrite.Range, vrToWrite).
-			ValueInputOption("RAW").
-			Do()
+		rowCount, err := t.table.WriteTable(vrToWrite)
 		if err != nil {
 			return UpdateStats{}, fmt.Errorf("error updating spreadsheet: %v", err)
 		}
-		log.Printf("updated %d rows for %s for %s", updateResp.UpdatedRows, donor, choice.Option.DisplayName)
+		log.Printf("updated %d rows for %s for %s", rowCount, donor, choice.Option.DisplayName)
 	}
 
 	totalCents := 0
