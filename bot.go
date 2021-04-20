@@ -287,7 +287,7 @@ func main() {
 	ircClient.OnPrivateMessage(func(m twitch.PrivateMessage) {
 		if ev, ok := donation.ParseBitsEvent(m); ok {
 			b.dispatchBitsEvent(ev)
-		} else if strings.HasPrefix(m.Message, bidCommand) {
+		} else if strings.HasPrefix(strings.ToLower(m.Message), bidCommand) {
 			b.dispatchBidCommand(m)
 		}
 	})
