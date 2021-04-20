@@ -192,6 +192,7 @@ func main() {
 	prod := flag.Bool("prod", false, "Whether to use real twitch.tv IRC. If false, connects to fdgt instead.")
 	targetChannel := flag.String("channel", "aerionblue", "The IRC channel to listen to")
 	twitchChatCredsPath := flag.String("twitch_chat_creds", "", "Path to the Twitch chat credentials file")
+	twitchChatRepliesEnabled := flag.Bool("chat_replies_enabled", true, "Whether Twitch chat replies are enabled")
 	firestoreCredsPath := flag.String("firestore_creds", "", "Path to the Firestore credentials file")
 	sheetsCredsPath := flag.String("sheets_creds", "", "Path to the Google Sheets OAuth client secret file")
 	sheetsTokenPath := flag.String("sheets_token", "", "Path to the Google Sheets OAuth token. If absent, you will be prompted to create a new token")
@@ -200,7 +201,7 @@ func main() {
 	flag.Parse()
 
 	var ircClient *twitch.Client
-	var ircRepliesEnabled bool
+	ircRepliesEnabled := *twitchChatRepliesEnabled
 	if *prod {
 		log.Printf("*** CONNECTING TO PROD #%s ***", *targetChannel)
 		chatCreds, err := twitchchat.ParseCreds(*twitchChatCredsPath)
@@ -208,7 +209,6 @@ func main() {
 			log.Fatal(err)
 		}
 		ircClient = twitch.NewClient(chatCreds.Username, chatCreds.OAuthToken)
-		ircRepliesEnabled = true
 	} else {
 		log.Printf("--- connecting to fdgt #%s ---", *targetChannel)
 		ircClient = twitch.NewAnonymousClient()
