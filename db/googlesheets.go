@@ -17,7 +17,7 @@ func NewGoogleSheetsClient(table *googlesheets.DonationTable) *sheetsClient {
 }
 
 func (c *sheetsClient) RecordDonation(ev donation.Event, bid bidwar.Choice) error {
-	err := c.table.Append(ev, bid.Option.DisplayName, bid.Reason)
+	err := c.table.Append(ev, bid.Option.ShortCode, bid.Reason)
 	if err != nil {
 		return fmt.Errorf("error appending data to sheet: %v", err)
 	}

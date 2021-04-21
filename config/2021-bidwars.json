@@ -4,11 +4,13 @@
             "name": "Ape Escape 3 Character",
             "options": [
                 {
-                    "displayName": "Kei",
+                    "displayName": "Kei (the boy)",
+                    "shortCode": "Kei",
                     "aliases": ["kei", "boy", "satoru"]
                 },
                 {
-                    "displayName": "Yumi",
+                    "displayName": "Yumi (the girl)",
+                    "shortCode": "Yumi",
                     "aliases": ["yumi", "girl", "sayaka"]
                 }
             ]
@@ -18,10 +20,12 @@
             "options": [
                 {
                     "displayName": "Leon",
+                    "shortCode": "Leon",
                     "aliases": ["leon"]
                 },
                 {
                     "displayName": "Claire",
+                    "shortCode": "Claire",
                     "aliases": ["claire"]
                 }
             ]
@@ -30,11 +34,13 @@
             "name": "Wacky Game Day III",
             "options": [
                 {
-                    "displayName": "Killer",
+                    "displayName": "Killer is Dead",
+                    "shortCode": "Killer",
                     "aliases": ["killer"]
                 },
                 {
-                    "displayName": "Shadows",
+                    "displayName": "Shadows of the Damned",
+                    "shortCode": "Shadows",
                     "aliases": ["shadows", "sotd"]
                 }
             ]
@@ -43,11 +49,13 @@
             "name": "GameCube Zelda",
             "options": [
                 {
-                    "displayName": "WW",
+                    "displayName": "Wind Waker",
+                    "shortCode": "WW",
                     "aliases": ["ww", "tww", "windwaker", "wind waker"]
                 },
                 {
-                    "displayName": "TP",
+                    "displayName": "Twilight Princess",
+                    "shortCode": "TP",
                     "aliases": ["tp", "twilight"]
                 }
             ]

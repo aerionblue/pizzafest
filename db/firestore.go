@@ -39,7 +39,7 @@ func (c *firestoreClient) RecordDonation(ev donation.Event, bid bidwar.Choice) e
 		SubMonths:    ev.SubMonths,
 		Cents:        ev.Cash.Cents(),
 		Bits:         ev.Bits,
-		BidwarChoice: bid.Option.DisplayName,
+		BidwarChoice: bid.Option.ShortCode,
 	}
 	// TODO(aerion): Plumb through a context from the IRC bot.
 	_, _, err := donations.Add(context.TODO(), doc)

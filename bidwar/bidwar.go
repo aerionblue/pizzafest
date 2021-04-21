@@ -38,10 +38,17 @@ type Contest struct {
 // Option is a contestant in a bid war. Donors can allocate money to an option
 // to help it win its bid war.
 type Option struct {
+	// The display name used when reporting bid war totals to users.
 	DisplayName string
+	// The short code used for bid war tracking. Must be unique in any Collection.
+	ShortCode string
 	// All the aliases by which this choice is known. Matching any of these
 	// aliases in a donation message designates the money to this choice.
 	Aliases []alias
+}
+
+func (o Option) IsZero() bool {
+	return o.ShortCode == ""
 }
 
 // Choice is a choice that a donor made for the bid war.
@@ -83,12 +90,11 @@ func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 	return Choice{Option: minOpt, Reason: reasonString(reason, msg)}
 }
 
-// FindContest returns the Contest that contains an Option with the given
-// display name.
-func (c Collection) FindContest(displayName string) Contest {
+// FindContest returns the Contest that contains the given Option.
+func (c Collection) FindContest(o Option) Contest {
 	for _, con := range c.Contests {
 		for _, opt := range con.Options {
-			if opt.DisplayName == displayName {
+			if opt.ShortCode == o.ShortCode {
 				return con
 			}
 		}
@@ -225,7 +231,7 @@ func (t Tallier) GetTotals() ([]Total, error) {
 	optsMap := make(map[string]Option)
 	for _, contest := range t.collection.Contests {
 		for _, option := range contest.Options {
-			optsMap[option.DisplayName] = option
+			optsMap[option.ShortCode] = option
 		}
 	}
 
@@ -262,7 +268,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) (UpdateStats, e
 		return UpdateStats{}, errors.New("donor must not be empty")
 	}
 	choice := t.collection.ChoiceFromMessage(message, FromChatMessage)
-	if choice.Option.DisplayName == "" {
+	if choice.Option.IsZero() {
 		return UpdateStats{}, nil
 	}
 	valueRange, err := t.table.GetTable()
@@ -277,7 +283,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) (UpdateStats, e
 		if err != nil {
 			return UpdateStats{}, fmt.Errorf("error updating spreadsheet: %v", err)
 		}
-		log.Printf("updated %d rows for %s for %s", rowCount, donor, choice.Option.DisplayName)
+		log.Printf("updated %d rows for %s for %s", rowCount, donor, choice.Option.ShortCode)
 	}
 
 	totalCents := 0
@@ -302,11 +308,11 @@ func (t Tallier) TotalsForContest(contest Contest) (Totals, error) {
 	}
 	optsByName := make(map[string]Option)
 	for _, opt := range contest.Options {
-		optsByName[opt.DisplayName] = opt
+		optsByName[opt.ShortCode] = opt
 	}
 	var totalsForContest []Total
 	for _, tot := range totals {
-		if _, ok := optsByName[tot.Option.DisplayName]; ok {
+		if _, ok := optsByName[tot.Option.ShortCode]; ok {
 			totalsForContest = append(totalsForContest, tot)
 		}
 	}
@@ -327,7 +333,7 @@ func makeChoice(vr *sheets.ValueRange, donor string, choice Choice) (*sheets.Val
 		var newRow []interface{}
 		dr := donationRow(row)
 		if dr.Contributor() == donor && dr.Choice() == "" {
-			newRow = rowForChoice(choice.Option.DisplayName, choice.Reason)
+			newRow = rowForChoice(choice)
 			updatedRows = append(updatedRows, dr)
 		} else {
 			newRow = []interface{}{}
@@ -383,6 +389,6 @@ func (d donationRow) column(n int) string {
 	return s
 }
 
-func rowForChoice(donor string, message string) donationRow {
-	return []interface{}{nil, nil, nil, donor, message}
+func rowForChoice(choice Choice) donationRow {
+	return []interface{}{nil, nil, nil, choice.Option.ShortCode, choice.Reason}
 }
