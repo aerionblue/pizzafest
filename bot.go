@@ -31,12 +31,18 @@ const bidCommand = "!bid"
 const chatCooldown = 5 * time.Second
 const massGiftCooldown = 5 * time.Second
 
+// The minimum value that we will acknowledge. Donations below this value are
+// still logged, and still count towards the grand total. We just won't
+// allocate them to bid wars or reply to them.
+const minimumDonation = donation.CentsValue(100)
+
 type bot struct {
 	ircClient         *twitch.Client
 	ircRepliesEnabled bool
 	dbRecorder        db.Recorder
 	bidwars           bidwar.Collection
 	bidwarTallier     *bidwar.Tallier
+	minimumDonation   donation.CentsValue
 
 	mu sync.RWMutex
 	// Maps a Twitch username to the last time they gave a community gift sub.
@@ -52,7 +58,10 @@ func (b *bot) dispatchSubEvent(ev donation.Event) {
 		return
 	}
 	log.Printf("new subscription by %v worth $%s (tier: %d, months: %d, count: %d)", ev.Owner, ev.Value(), ev.SubTier, ev.SubMonths, ev.SubCount)
-	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromSubMessage)
+	var bid bidwar.Choice
+	if ev.Value() >= b.minimumDonation {
+		bid = b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromSubMessage)
+	}
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
 			log.Printf("ERROR writing donation to db: %v", err)
@@ -67,7 +76,10 @@ func (b *bot) dispatchSubEvent(ev donation.Event) {
 
 func (b *bot) dispatchBitsEvent(ev donation.Event) {
 	log.Printf("new bits donation by %v worth $%s (bits: %d)", ev.Owner, ev.Value(), ev.Bits)
-	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromChatMessage)
+	var bid bidwar.Choice
+	if ev.Value() >= b.minimumDonation {
+		bid = b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromChatMessage)
+	}
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
 			log.Printf("ERROR writing donation to db: %v", err)
@@ -89,7 +101,7 @@ func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 			return
 		}
 		var msg string
-		if updateStats.TotalValue.Cents() > 0 {
+		if updateStats.TotalValue >= b.minimumDonation {
 			msg = fmt.Sprintf("@%s: I put your $%s towards %s.",
 				donor, updateStats.TotalValue, updateStats.Option.DisplayName)
 		}
@@ -99,7 +111,10 @@ func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 
 func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
 	log.Printf("new streamlabs donation by %v worth $%s (cash: %s)", ev.Owner, ev.Value(), ev.Cash)
-	bid := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromDonationMessage)
+	var bid bidwar.Choice
+	if ev.Value() >= b.minimumDonation {
+		bid = b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromDonationMessage)
+	}
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
 			log.Printf("ERROR writing donation to db: %v", err)
@@ -178,6 +193,7 @@ func doLocalTest(b *bot, channel string, ircClient *twitch.Client, tallier *bidw
 	ircClient.Say(channel, "subgift --username usedpizza --username2 eldritchdildoes")
 	ircClient.Say(channel, `bits --bitscount 444 --username "Mizalie" usedU`)
 	ircClient.Say(channel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
+	ircClient.Say(channel, `bits --bitscount 50 --username "50cent" i'm a punk bitch and i want twilight princess`)
 	<-time.After(2 * time.Second)
 	pm := twitch.PrivateMessage{
 		User:    twitch.User{Name: "aerionblue"},
@@ -276,6 +292,7 @@ func main() {
 		dbRecorder:        dbRecorder,
 		bidwars:           bidwars,
 		bidwarTallier:     bidwarTallier,
+		minimumDonation:   minimumDonation,
 		communityGifts:    make(map[string]time.Time),
 	}
 
