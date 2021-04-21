@@ -59,10 +59,11 @@ const (
 )
 
 // ChoiceFromMessage determines whether the given donation message or chat
-// message mentioned one of the bid war options in this Collection, and returns
-// a Choice representing that Option. If no bid war option was found, returns
-// the zero value. If more than one Option matches, returns the match that
-// occurs earliest (leftmost) in the message.
+// message mentioned one of the bid war options in this Collection, and
+// returns a Choice representing that Option. If no bid war option was found,
+// returns a Choice with the zero Option (but possibly non-zero Reason). If
+// more than one Option matches, returns the match that occurs earliest
+// (leftmost) in the message.
 func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 	minIndex := -1
 	minOpt := Option{}
@@ -78,9 +79,6 @@ func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 				}
 			}
 		}
-	}
-	if minIndex < 0 {
-		return Choice{}
 	}
 	return Choice{Option: minOpt, Reason: reasonString(reason, msg)}
 }

@@ -176,7 +176,7 @@ func doLocalTest(b *bot, channel string, ircClient *twitch.Client, tallier *bidw
 	ircClient.Say(channel, "submysterygift --username usedpizza --count 3")
 	ircClient.Say(channel, "subgift --username aerionblue --username2 AEWC20XX")
 	ircClient.Say(channel, "subgift --username usedpizza --username2 eldritchdildoes")
-	ircClient.Say(channel, "subgift --username usedpizza --username2 Mia_Khalifa")
+	ircClient.Say(channel, `bits --bitscount 444 --username "Mizalie" usedU`)
 	ircClient.Say(channel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
 	<-time.After(2 * time.Second)
 	pm := twitch.PrivateMessage{
