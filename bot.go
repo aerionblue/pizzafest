@@ -22,8 +22,8 @@ import (
 
 const testIRCAddress = "irc.fdgt.dev:6667"
 
-const spreadsheetID = "192vz0Kskkcv3vGuCnRDLlpdwc8_1fuU4Am5g7M7YrO8" // This is the testing sheet ID
-//const spreadsheetID = "1FkioQXOEAe3UylIjTUEpA-1nf0kJ4JD_dU9v2yBFdfE"  // This is the real sheet ID
+//const spreadsheetID = "192vz0Kskkcv3vGuCnRDLlpdwc8_1fuU4Am5g7M7YrO8" // This is the testing sheet ID
+const spreadsheetID = "1FkioQXOEAe3UylIjTUEpA-1nf0kJ4JD_dU9v2yBFdfE" // This is the real sheet ID
 const bidTrackerSheetName = "Bid war tracker"
 
 const bidCommand = "!bid"
