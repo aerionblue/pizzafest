@@ -28,7 +28,7 @@ const bidTrackerSheetName = "Bid war tracker"
 
 const bidCommand = "!bid"
 
-const chatCooldown = 5 * time.Second
+const chatCooldown = 2 * time.Second
 const massGiftCooldown = 5 * time.Second
 
 // The minimum value that we will acknowledge. Donations below this value are
