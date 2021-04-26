@@ -332,7 +332,7 @@ func makeChoice(vr *sheets.ValueRange, donor string, choice Choice) (*sheets.Val
 	for i, row := range vr.Values {
 		var newRow []interface{}
 		dr := donationRow(row)
-		if dr.Contributor() == donor && dr.Choice() == "" {
+		if strings.EqualFold(dr.Contributor(), donor) && dr.Choice() == "" {
 			newRow = rowForChoice(choice)
 			updatedRows = append(updatedRows, dr)
 		} else {
