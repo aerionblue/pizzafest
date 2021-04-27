@@ -29,7 +29,7 @@ const bidTrackerSheetName = "Bid war tracker"
 const bidCommand = "!bid"
 
 // Minimum duration between outgoing chat messages.
-const chatCooldown = 2 * time.Second
+const chatCooldown = 1 * time.Second
 
 // How long we remember a user's !bid preference.
 const bidPrefTTL = 3 * time.Minute
