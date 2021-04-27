@@ -161,7 +161,7 @@ type Totals []Total
 func (tt Totals) String() string {
 	var totalStrs []string
 	for _, t := range tt {
-		totalStrs = append(totalStrs, fmt.Sprintf("%s: $%s", t.Option.DisplayName, t.Value))
+		totalStrs = append(totalStrs, fmt.Sprintf("%s: %s", t.Option.DisplayName, t.Value))
 	}
 	return strings.Join(totalStrs, ", ")
 }

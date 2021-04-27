@@ -102,8 +102,8 @@ func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 		}
 		var msg string
 		if updateStats.TotalValue >= b.minimumDonation {
-			msg = fmt.Sprintf("@%s: I put your $%s towards %s.",
-				donor, updateStats.TotalValue, updateStats.Option.DisplayName)
+			msg = fmt.Sprintf("@%s: I put your %d points towards %s.",
+				donor, int(updateStats.TotalValue.Points()), updateStats.Option.DisplayName)
 		}
 		b.sayWithTotals(m.Channel, updateStats.Option, msg)
 	}()

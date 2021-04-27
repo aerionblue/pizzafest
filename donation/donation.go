@@ -223,9 +223,14 @@ func ParseBitsEvent(m twitch.PrivateMessage) (Event, bool) {
 // Value is the value of a donation.
 type CentsValue int
 
-// String expresses the value in dollars, without a currency symbol.
+// String expresses the value in points, with 2 decimal places.
 func (v CentsValue) String() string {
-	return fmt.Sprintf("%0.2f", float64(v)/100)
+	return fmt.Sprintf("%0.2f", v.Points())
+}
+
+// Points converts the value to Pizza Fest points (one point per dollar).
+func (v CentsValue) Points() float64 {
+	return float64(v) / 100
 }
 
 func (v CentsValue) Cents() int {
