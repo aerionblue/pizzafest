@@ -187,7 +187,7 @@ func (tt Totals) String() string {
 
 // UpdateStats summarizes the changes made to a bid war.
 type UpdateStats struct {
-	Option     Option
+	Choice     Choice
 	Count      int
 	TotalValue donation.CentsValue
 }
@@ -310,7 +310,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) (UpdateStats, e
 		totalCents += dr.Cents()
 	}
 	updateStats := UpdateStats{
-		Option:     choice.Option,
+		Choice:     choice,
 		Count:      len(matchedRows),
 		TotalValue: donation.CentsValue(totalCents),
 	}

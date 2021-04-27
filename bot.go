@@ -28,7 +28,13 @@ const bidTrackerSheetName = "Bid war tracker"
 
 const bidCommand = "!bid"
 
+// Minimum duration between outgoing chat messages.
 const chatCooldown = 2 * time.Second
+
+// How long we remember a user's !bid preference.
+const bidPrefTTL = 3 * time.Minute
+
+// How long we ignore individual gift sub events after a community gift.
 const massGiftCooldown = 5 * time.Second
 
 // The minimum value that we will acknowledge. Donations below this value are
@@ -47,7 +53,11 @@ type bot struct {
 	mu sync.RWMutex
 	// Maps a Twitch username to the last time they gave a community gift sub.
 	communityGifts map[string]time.Time
-	lastChatTime   time.Time
+	// Maps a Twitch username to a bid war preference. When a user uses !bid but
+	// has no donations to assign, we keep track of it for a few minutes just in
+	// case the donation data was slow in getting to us.
+	pendingBids  map[string]*bidPreference
+	lastChatTime time.Time
 }
 
 func (b *bot) dispatchSubEvent(ev donation.Event) {
@@ -58,10 +68,7 @@ func (b *bot) dispatchSubEvent(ev donation.Event) {
 		return
 	}
 	log.Printf("new subscription by %v worth $%s (tier: %d, months: %d, count: %d)", ev.Owner, ev.Value(), ev.SubTier, ev.SubMonths, ev.SubCount)
-	var bid bidwar.Choice
-	if ev.Value() >= b.minimumDonation {
-		bid = b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromSubMessage)
-	}
+	bid := b.getChoice(ev, bidwar.FromSubMessage)
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
 			log.Printf("ERROR writing donation to db: %v", err)
@@ -76,10 +83,7 @@ func (b *bot) dispatchSubEvent(ev donation.Event) {
 
 func (b *bot) dispatchBitsEvent(ev donation.Event) {
 	log.Printf("new bits donation by %v worth $%s (bits: %d)", ev.Owner, ev.Value(), ev.Bits)
-	var bid bidwar.Choice
-	if ev.Value() >= b.minimumDonation {
-		bid = b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromChatMessage)
-	}
+	bid := b.getChoice(ev, bidwar.FromChatMessage)
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
 			log.Printf("ERROR writing donation to db: %v", err)
@@ -100,7 +104,8 @@ func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 			log.Printf("ERROR assigning bid command for %s", donor)
 			return
 		}
-		if updateStats.Option.IsZero() {
+		opt := updateStats.Choice.Option
+		if opt.IsZero() {
 			opts := b.bidwars.AllOpenOptions()
 			if len(opts) > 0 {
 				shortCodes := make([]string, len(opts))
@@ -112,20 +117,19 @@ func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 			return
 		}
 		var msg string
-		if updateStats.TotalValue >= b.minimumDonation {
-			msg = fmt.Sprintf("@%s: I put your %d points towards %s.",
-				donor, int(updateStats.TotalValue.Points()), updateStats.Option.DisplayName)
+		if updateStats.TotalValue.Points() > 0 {
+			msg = fmt.Sprintf("@%s: +%s for %s usedNice", donor, updateStats.TotalValue, opt.DisplayName)
+		} else {
+			b.rememberPref(donor, updateStats.Choice)
+			msg = fmt.Sprintf("@%s: You had no points used7 but I'll remember your choice for a few minutes.", donor)
 		}
-		b.sayWithTotals(m.Channel, updateStats.Option, msg)
+		b.sayWithTotals(m.Channel, opt, msg)
 	}()
 }
 
 func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
 	log.Printf("new streamlabs donation by %v worth $%s (cash: %s)", ev.Owner, ev.Value(), ev.Cash)
-	var bid bidwar.Choice
-	if ev.Value() >= b.minimumDonation {
-		bid = b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromDonationMessage)
-	}
+	bid := b.getChoice(ev, bidwar.FromDonationMessage)
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
 			log.Printf("ERROR writing donation to db: %v", err)
@@ -137,6 +141,33 @@ func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
 			fmt.Sprintf("$%s donation from %s put towards %s.",
 				ev.Value(), ev.Owner, bid.Option.DisplayName))
 	}()
+}
+
+func (b *bot) getChoice(ev donation.Event, reason bidwar.ChoiceReason) bidwar.Choice {
+	if ev.Value() < b.minimumDonation {
+		return bidwar.Choice{}
+	}
+	choice := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromSubMessage)
+	if !choice.Option.IsZero() {
+		return choice
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	pref, ok := b.pendingBids[ev.Owner]
+	delete(b.pendingBids, ev.Owner)
+	if !ok {
+		return bidwar.Choice{}
+	}
+	if time.Now().After(pref.Expiration) {
+		return bidwar.Choice{}
+	}
+	return pref.Choice
+}
+
+func (b *bot) rememberPref(username string, choice bidwar.Choice) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.pendingBids[username] = &bidPreference{Choice: choice, Expiration: time.Now().Add(bidPrefTTL)}
 }
 
 func (b *bot) updateCommunityGift(ev donation.Event) {
@@ -194,6 +225,12 @@ func (b *bot) sayWithTotals(channel string, opt bidwar.Option, msgPrefix string)
 		msg = msgPrefix + " " + msg
 	}
 	b.say(channel, msg)
+}
+
+// bidPreference represents a bid war choice that somebody expressed in the past.
+type bidPreference struct {
+	Choice     bidwar.Choice
+	Expiration time.Time
 }
 
 func doLocalTest(b *bot, channel string, ircClient *twitch.Client, tallier *bidwar.Tallier) {
@@ -305,6 +342,7 @@ func main() {
 		bidwarTallier:     bidwarTallier,
 		minimumDonation:   minimumDonation,
 		communityGifts:    make(map[string]time.Time),
+		pendingBids:       make(map[string]*bidPreference),
 	}
 
 	ircClient.OnUserNoticeMessage(func(m twitch.UserNoticeMessage) {
