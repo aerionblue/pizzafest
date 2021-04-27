@@ -100,6 +100,17 @@ func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 			log.Printf("ERROR assigning bid command for %s", donor)
 			return
 		}
+		if updateStats.Option.IsZero() {
+			opts := b.bidwars.AllOpenOptions()
+			if len(opts) > 0 {
+				shortCodes := make([]string, len(opts))
+				for i, o := range opts {
+					shortCodes[i] = o.ShortCode
+				}
+				b.say(m.Channel, fmt.Sprintf("@%s: These are the options: %s", donor, strings.Join(shortCodes, ", ")))
+			}
+			return
+		}
 		var msg string
 		if updateStats.TotalValue >= b.minimumDonation {
 			msg = fmt.Sprintf("@%s: I put your %d points towards %s.",

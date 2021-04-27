@@ -65,6 +65,18 @@ const (
 	FromSubMessage
 )
 
+// AllOpenOptions returns a list of all Options in Contests that are currently
+// open for bidding.
+func (c Collection) AllOpenOptions() []Option {
+	var opts []Option
+	for _, con := range c.Contests {
+		for _, opt := range con.Options {
+			opts = append(opts, opt)
+		}
+	}
+	return opts
+}
+
 // ChoiceFromMessage determines whether the given donation message or chat
 // message mentioned one of the bid war options in this Collection, and
 // returns a Choice representing that Option. If no bid war option was found,
@@ -74,15 +86,13 @@ const (
 func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 	minIndex := -1
 	minOpt := Option{}
-	for _, con := range c.Contests {
-		for _, opt := range con.Options {
-			for _, a := range opt.Aliases {
-				if loc := a.FindStringIndex(msg); loc != nil {
-					idx := loc[0]
-					if minIndex > idx || minIndex < 0 {
-						minIndex = idx
-						minOpt = opt
-					}
+	for _, opt := range c.AllOpenOptions() {
+		for _, a := range opt.Aliases {
+			if loc := a.FindStringIndex(msg); loc != nil {
+				idx := loc[0]
+				if minIndex > idx || minIndex < 0 {
+					minIndex = idx
+					minOpt = opt
 				}
 			}
 		}
