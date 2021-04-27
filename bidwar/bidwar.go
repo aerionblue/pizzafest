@@ -33,6 +33,7 @@ type Collection struct {
 type Contest struct {
 	Name    string
 	Options []Option
+	Closed  bool
 }
 
 // Option is a contestant in a bid war. Donors can allocate money to an option
@@ -70,6 +71,9 @@ const (
 func (c Collection) AllOpenOptions() []Option {
 	var opts []Option
 	for _, con := range c.Contests {
+		if con.Closed {
+			continue
+		}
 		for _, opt := range con.Options {
 			opts = append(opts, opt)
 		}
@@ -100,9 +104,14 @@ func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 	return Choice{Option: minOpt, Reason: reasonString(reason, msg)}
 }
 
-// FindContest returns the Contest that contains the given Option.
+// FindContest returns the open Contest that contains the given Option. If no
+// Contest is matched, or if only closed Contests are matched, the zero
+// Contest is returned.
 func (c Collection) FindContest(o Option) Contest {
 	for _, con := range c.Contests {
+		if con.Closed {
+			continue
+		}
 		for _, opt := range con.Options {
 			if opt.ShortCode == o.ShortCode {
 				return con
