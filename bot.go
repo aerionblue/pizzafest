@@ -147,7 +147,7 @@ func (b *bot) getChoice(ev donation.Event, reason bidwar.ChoiceReason) bidwar.Ch
 	if ev.Value() < b.minimumDonation {
 		return bidwar.Choice{}
 	}
-	choice := b.bidwars.ChoiceFromMessage(ev.Message, bidwar.FromSubMessage)
+	choice := b.bidwars.ChoiceFromMessage(ev.Message, reason)
 	if !choice.Option.IsZero() {
 		return choice
 	}
