@@ -153,8 +153,9 @@ func (b *bot) getChoice(ev donation.Event, reason bidwar.ChoiceReason) bidwar.Ch
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	pref, ok := b.pendingBids[ev.Owner]
-	delete(b.pendingBids, ev.Owner)
+	donor := strings.ToLower(ev.Owner)
+	pref, ok := b.pendingBids[donor]
+	delete(b.pendingBids, donor)
 	if !ok {
 		return bidwar.Choice{}
 	}
@@ -167,7 +168,7 @@ func (b *bot) getChoice(ev donation.Event, reason bidwar.ChoiceReason) bidwar.Ch
 func (b *bot) rememberPref(username string, choice bidwar.Choice) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.pendingBids[username] = &bidPreference{Choice: choice, Expiration: time.Now().Add(bidPrefTTL)}
+	b.pendingBids[strings.ToLower(username)] = &bidPreference{Choice: choice, Expiration: time.Now().Add(bidPrefTTL)}
 }
 
 func (b *bot) updateCommunityGift(ev donation.Event) {
