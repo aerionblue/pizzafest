@@ -1,8 +1,10 @@
 package bidwar
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/aerionblue/pizzafest/donation"
 	"github.com/go-test/deep"
 	"google.golang.org/api/sheets/v4"
 )
@@ -112,6 +114,35 @@ func TestMakeChoice(t *testing.T) {
 			}
 			if diff := deep.Equal(gotRows, tc.wantRows); diff != nil {
 				t.Error(diff)
+			}
+		})
+	}
+}
+
+func TestTotalsToString(t *testing.T) {
+	for _, tc := range []struct {
+		desc        string
+		centsTotals []int
+		want        string
+	}{
+		{"two options", []int{1000, 994}, "Option 1: 10.00, Option 2: 9.94 (down by 0.06)"},
+		{"two options, reversed", []int{994, 1000}, "Option 1: 9.94 (down by 0.06), Option 2: 10.00"},
+		{"three options", []int{12345, 11037, 10000}, "Option 1: 123.45, Option 2: 110.37 (down by 13.08), Option 3: 100.00 (down by 23.45)"},
+		{"three options, tie for lead", []int{500, 150, 500}, "Option 1: 5.00, Option 2: 1.50 (down by 3.50), Option 3: 5.00"},
+		{"one option", []int{999}, "Option 1: 9.99"},
+		{"zero options", []int{}, ""},
+	} {
+		var totals []Total
+		for n, cents := range tc.centsTotals {
+			totals = append(totals, Total{
+				Option: Option{DisplayName: fmt.Sprintf("Option %d", n+1)},
+				Value:  donation.CentsValue(cents),
+			})
+		}
+		t.Run(tc.desc, func(t *testing.T) {
+			got := Totals(totals).String()
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
 	}

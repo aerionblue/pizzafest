@@ -179,9 +179,19 @@ func (b byCents) Less(i, j int) bool { return b[i].Value.Cents() < b[j].Value.Ce
 type Totals []Total
 
 func (tt Totals) String() string {
+	maxValue := donation.CentsValue(0)
+	for _, t := range tt {
+		if t.Value > maxValue {
+			maxValue = t.Value
+		}
+	}
 	var totalStrs []string
 	for _, t := range tt {
-		totalStrs = append(totalStrs, fmt.Sprintf("%s: %s", t.Option.DisplayName, t.Value))
+		s := fmt.Sprintf("%s: %s", t.Option.DisplayName, t.Value)
+		if t.Value < maxValue {
+			s += fmt.Sprintf(" (down by %s)", maxValue-t.Value)
+		}
+		totalStrs = append(totalStrs, s)
 	}
 	return strings.Join(totalStrs, ", ")
 }
