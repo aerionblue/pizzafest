@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -273,7 +274,10 @@ func (t Tallier) GetTotals() ([]Total, error) {
 			if err != nil {
 				return nil, fmt.Errorf("invalid total for %v: %v", n, v)
 			}
-			totals = append(totals, Total{Option: opt, Value: donation.CentsValue(int(dollars * 100))})
+			totals = append(totals, Total{
+				Option: opt,
+				Value:  donation.CentsValue(int(math.Round(dollars * 100))),
+			})
 		}
 	}
 	return totals, nil
@@ -389,9 +393,9 @@ func (d donationRow) Cents() int {
 		if err != nil {
 			return 0
 		}
-		cents = int(f * 100)
+		cents = int(math.Round(f * 100))
 	case float64:
-		cents = int(v * 100)
+		cents = int(math.Round(v * 100))
 	}
 	return cents
 }
