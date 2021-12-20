@@ -35,7 +35,7 @@ const chatCooldown = 1 * time.Second
 const bidPrefTTL = 3 * time.Minute
 
 // How long we ignore individual gift sub events after a community gift.
-const massGiftCooldown = 5 * time.Second
+const massGiftCooldown = 10 * time.Second
 
 // The minimum value that we will acknowledge. Donations below this value are
 // still logged, and still count towards the grand total. We just won't
