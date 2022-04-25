@@ -6,26 +6,31 @@
                 {
                     "displayName": "Hybrid Heaven",
                     "shortCode": "Hybrid Heaven",
+                    "closed": false,
                     "aliases": ["hybrid heaven", "hybrid", "heaven", "hh"]
                 },
                 {
                     "displayName": "God Hand",
                     "shortCode": "God Hand",
+                    "closed": false,
                     "aliases": ["god hand", "god", "hand", "godhand", "gh"]
                 },
                 {
                     "displayName": "Raw Danger!",
                     "shortCode": "Raw Danger",
+                    "closed": false,
                     "aliases": ["raw danger", "raw", "danger", "rd"]
                 },
                 {
                     "displayName": "Ride to Hell",
                     "shortCode": "Ride to Hell",
+                    "closed": false,
                     "aliases": ["ride to hell", "ride", "hell", "rth"]
                 },
                 {
                     "displayName": "Deep Fear",
                     "shortCode": "Deep Fear",
+                    "closed": false,
                     "aliases": ["deep fear", "deep", "fear", "df"]
                 }
             ]

@@ -47,6 +47,9 @@ type Option struct {
 	// All the aliases by which this choice is known. Matching any of these
 	// aliases in a donation message designates the money to this choice.
 	Aliases []alias
+	// Whether this option is closed to new bids. Bids for closed options will
+	// be ignored.
+	Closed bool
 }
 
 func (o Option) IsZero() bool {
@@ -67,8 +70,7 @@ const (
 	FromSubMessage
 )
 
-// AllOpenOptions returns a list of all Options in Contests that are currently
-// open for bidding.
+// AllOpenOptions returns a list of all open Options in all open Contests.
 func (c Collection) AllOpenOptions() []Option {
 	var opts []Option
 	for _, con := range c.Contests {
@@ -76,6 +78,9 @@ func (c Collection) AllOpenOptions() []Option {
 			continue
 		}
 		for _, opt := range con.Options {
+			if opt.Closed {
+				continue
+			}
 			opts = append(opts, opt)
 		}
 	}
@@ -187,6 +192,10 @@ func (tt Totals) String() string {
 	}
 	var totalStrs []string
 	for _, t := range tt {
+		// Don't bother reporting totals that bidders can't change.
+		if t.Option.Closed {
+			continue
+		}
 		s := fmt.Sprintf("%s: %s", t.Option.DisplayName, t.Value)
 		if t.Value < maxValue {
 			s += fmt.Sprintf(" (down by %s)", maxValue-t.Value)
