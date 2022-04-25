@@ -1,0 +1,34 @@
+{
+    "contests": [
+        {
+            "name": "Greatest Hits",
+            "options": [
+                {
+                    "displayName": "Hybrid Heaven",
+                    "shortCode": "Hybrid Heaven",
+                    "aliases": ["hybrid heaven", "hybrid", "heaven", "hh"]
+                },
+                {
+                    "displayName": "God Hand",
+                    "shortCode": "God Hand",
+                    "aliases": ["god hand", "god", "hand", "godhand", "gh"]
+                },
+                {
+                    "displayName": "Raw Danger!",
+                    "shortCode": "Raw Danger",
+                    "aliases": ["raw danger", "raw", "danger", "rd"]
+                },
+                {
+                    "displayName": "Ride to Hell",
+                    "shortCode": "Ride to Hell",
+                    "aliases": ["ride to hell", "ride", "hell", "rth"]
+                },
+                {
+                    "displayName": "Deep Fear",
+                    "shortCode": "Deep Fear",
+                    "aliases": ["deep fear", "deep", "fear", "df"]
+                }
+            ]
+        }
+    ]
+}
