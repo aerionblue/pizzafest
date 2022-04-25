@@ -241,14 +241,14 @@ func doLocalTest(b *bot, channel string, ircClient *twitch.Client, tallier *bidw
 	ircClient.Say(channel, "subgift --username aerionblue --username2 AEWC20XX")
 	ircClient.Say(channel, "subgift --username usedpizza --username2 eldritchdildoes")
 	ircClient.Say(channel, `bits --bitscount 444 --username "Mizalie" usedU`)
-	ircClient.Say(channel, `bits --bitscount 250 --username "TWRoxas" shadows of the damned`)
-	ircClient.Say(channel, `bits --bitscount 50 --username "50cent" i'm a punk bitch and i want twilight princess`)
+	ircClient.Say(channel, `bits --bitscount 250 --username "TWRoxas" ride to hell`)
+	ircClient.Say(channel, `bits --bitscount 50 --username "50cent" i'm a punk bitch and i want hh`)
 	<-time.After(2 * time.Second)
 	pm := twitch.PrivateMessage{
 		User:    twitch.User{Name: "aerionblue"},
 		Type:    twitch.PRIVMSG,
 		Channel: "testing",
-		Message: "!bid wind waker please",
+		Message: "!bid put it all on RAW DANGER",
 	}
 	b.dispatchBidCommand(pm)
 }
