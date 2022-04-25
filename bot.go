@@ -22,10 +22,6 @@ import (
 
 const testIRCAddress = "irc.fdgt.dev:6667"
 
-//const spreadsheetID = "192vz0Kskkcv3vGuCnRDLlpdwc8_1fuU4Am5g7M7YrO8" // This is the testing sheet ID
-const spreadsheetID = "1iaVvnYUWTKSC1_zMbg6dZmnbZzwynhcHixPcBqbR3IA" // This is the real sheet ID
-const bidTrackerSheetName = "Bid war tracker"
-
 const bidCommand = "!bid"
 
 // Minimum duration between outgoing chat messages.
@@ -256,6 +252,7 @@ func doLocalTest(b *bot, channel string, ircClient *twitch.Client, tallier *bidw
 func main() {
 	prod := flag.Bool("prod", false, "Whether to use real twitch.tv IRC. If false, connects to fdgt instead.")
 	targetChannel := flag.String("channel", "aerionblue", "The IRC channel to listen to")
+	configPath := flag.String("config_json", "", "Path to the bot config JSON file. Required.")
 	twitchChatCredsPath := flag.String("twitch_chat_creds", "", "Path to the Twitch chat credentials file")
 	twitchChatRepliesEnabled := flag.Bool("chat_replies_enabled", true, "Whether Twitch chat replies are enabled")
 	firestoreCredsPath := flag.String("firestore_creds", "", "Path to the Firestore credentials file")
@@ -264,6 +261,14 @@ func main() {
 	streamlabsCredsPath := flag.String("streamlabs_creds", "", "Path to a Streamlabs OAuth token. If absent, Streamlabs donation checking will be disabled")
 	bidWarDataPath := flag.String("bidwar_data", "", "Path to a JSON file describing the current bid wars")
 	flag.Parse()
+
+	if *configPath == "" {
+		log.Fatalf("--config_json flag is required")
+	}
+	cfg, err := ParseBotConfig(*configPath)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	var ircClient *twitch.Client
 	ircRepliesEnabled := *twitchChatRepliesEnabled
@@ -305,9 +310,9 @@ func main() {
 		if err != nil {
 			log.Fatalf("error initializing Google Sheets API: %v", err)
 		}
-		donationTable := googlesheets.NewDonationTable(sheetsSrv, spreadsheetID, bidTrackerSheetName)
+		donationTable := googlesheets.NewDonationTable(sheetsSrv, cfg.Spreadsheet.ID, cfg.Spreadsheet.SheetName)
 		dbRecorder = db.NewGoogleSheetsClient(donationTable)
-		bidwarTallier = bidwar.NewTallier(sheetsSrv, donationTable, spreadsheetID, bidwars)
+		bidwarTallier = bidwar.NewTallier(sheetsSrv, donationTable, cfg.Spreadsheet.ID, bidwars)
 		bidTotals, err := bidwarTallier.GetTotals()
 		if err != nil {
 			log.Fatalf("error reading current bid war totals: %v", err)
