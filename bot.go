@@ -17,6 +17,7 @@ import (
 	"github.com/aerionblue/pizzafest/donation"
 	"github.com/aerionblue/pizzafest/googlesheets"
 	"github.com/aerionblue/pizzafest/streamlabs"
+	"github.com/aerionblue/pizzafest/tipfile"
 	"github.com/aerionblue/pizzafest/twitchchat"
 )
 
@@ -123,8 +124,8 @@ func (b *bot) dispatchBidCommand(m twitch.PrivateMessage) {
 	}()
 }
 
-func (b *bot) dispatchStreamlabsDonation(ev donation.Event) {
-	log.Printf("new streamlabs donation by %v worth $%s (cash: %s)", ev.Owner, ev.Value(), ev.Cash)
+func (b *bot) dispatchMoneyDonation(ev donation.Event) {
+	log.Printf("new dolla donation by %v worth $%s (cash: %s)", ev.Owner, ev.Value(), ev.Cash)
 	bid := b.getChoice(ev, bidwar.FromDonationMessage)
 	go func() {
 		if err := b.dbRecorder.RecordDonation(ev, bid); err != nil {
@@ -259,6 +260,7 @@ func main() {
 	sheetsCredsPath := flag.String("sheets_creds", "", "Path to the Google Sheets OAuth client secret file")
 	sheetsTokenPath := flag.String("sheets_token", "", "Path to the Google Sheets OAuth token. If absent, you will be prompted to create a new token")
 	streamlabsCredsPath := flag.String("streamlabs_creds", "", "Path to a Streamlabs OAuth token. If absent, Streamlabs donation checking will be disabled")
+	tipLogPath := flag.String("tip_log_path", "", "Path to a text file where some other process is logging incoming donations")
 	bidWarDataPath := flag.String("bidwar_data", "", "Path to a JSON file describing the current bid wars")
 	flag.Parse()
 
@@ -303,6 +305,7 @@ func main() {
 
 	var dbRecorder db.Recorder
 	var donationPoller *streamlabs.DonationPoller
+	var tipWatcher *tipfile.Watcher
 	var bidwarTallier *bidwar.Tallier
 	if *sheetsCredsPath != "" {
 		var err error
@@ -339,6 +342,13 @@ func main() {
 	} else {
 		log.Print("no Streamlabs token provided")
 	}
+	if *tipLogPath != "" {
+		tipWatcher, err = tipfile.NewWatcher(*tipLogPath, *targetChannel)
+		if err != nil {
+			log.Fatalf("error creating tip file watcher: %v", err)
+		}
+		defer tipWatcher.Close()
+	}
 
 	b := &bot{
 		ircClient:         ircClient,
@@ -367,11 +377,22 @@ func main() {
 
 	if donationPoller != nil {
 		donationPoller.OnDonation(func(ev donation.Event) {
-			b.dispatchStreamlabsDonation(ev)
+			b.dispatchMoneyDonation(ev)
 		})
 		if err := donationPoller.Start(); err != nil {
 			log.Fatalf("Streamlabs polling error: %v", err)
 		}
+	}
+
+	if tipWatcher != nil {
+		go func() {
+			for {
+				select {
+				case ev := <-tipWatcher.C:
+					b.dispatchMoneyDonation(ev)
+				}
+			}
+		}()
 	}
 
 	if !*prod {

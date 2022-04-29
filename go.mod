@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	cloud.google.com/go/firestore v1.5.0
+	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/gempir/go-twitch-irc/v2 v2.5.0
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/google/go-cmp v0.5.4
