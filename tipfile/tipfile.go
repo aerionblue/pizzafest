@@ -21,8 +21,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aerionblue/pizzafest/donation"
+	retry "github.com/avast/retry-go"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -70,6 +72,8 @@ func NewWatcher(path string, twitchChannel string) (*Watcher, error) {
 				if event.Op != fsnotify.Write {
 					continue
 				}
+				// Wait a moment to give the writer a chance to close the file.
+				time.Sleep(500 * time.Millisecond)
 				// TODO(aerion): Don't re-read the entire file every time.
 				newEvents, err := w.processTipLog(event.Name)
 				if err != nil {
@@ -89,7 +93,7 @@ func NewWatcher(path string, twitchChannel string) (*Watcher, error) {
 				if !ok {
 					return
 				}
-				log.Printf("ERROR reading donation tip log: %v", err)
+				log.Printf("ERROR watching donation tip log: %v", err)
 			}
 		}
 	}()
@@ -112,7 +116,18 @@ func (w *Watcher) processTipLog(path string) ([]logEntry, error) {
 
 	var newEntries []logEntry
 
-	f, err := os.Open(path)
+	var f *os.File
+	// Try opening the file a few times, in case the file is still being held
+	// open by the writing process (which has happened, in practice).
+	err := retry.Do(
+		func() error {
+			var err error
+			f, err = os.Open(path)
+			return err
+		},
+		retry.Delay(1*time.Second),
+		retry.Attempts(3),
+	)
 	if err != nil {
 		return nil, err
 	}
