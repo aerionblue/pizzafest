@@ -140,7 +140,54 @@ func TestTotalsToString(t *testing.T) {
 			})
 		}
 		t.Run(tc.desc, func(t *testing.T) {
-			got := Totals(totals).String()
+			got := Totals{totals: totals}.Describe(Option{})
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTotalsToStringLastPlaceStyle(t *testing.T) {
+	for _, tc := range []struct {
+		desc        string
+		centsTotals []int
+		lastBid     string
+		want        string
+	}{
+		{"two options", []int{1000, 994}, "", "Last place: B (down by 0.06)"},
+		{"two options, lastBid for leader", []int{1000, 994}, "A", "A is currently #1. Last place: B (down by 0.06)"},
+		{"two options, lastBid for trailer", []int{1000, 994}, "B", "B is still in last place (down by 0.06) usedShame"},
+		{"last place has $0", []int{0, 1000}, "", "Last place: A (down by 10.00)"},
+		{"four options", []int{12345, 11037, 9000, 5000}, "", "Last place: D (down by 40.00)"},
+		{"four options, lastBid on 1st place", []int{12345, 11037, 9000, 5000}, "A", "A is currently #1. Last place: D (down by 40.00)"},
+		{"four options, lastBid on 2nd place", []int{12345, 11037, 9000, 5000}, "B", "B is currently #2. Last place: D (down by 40.00)"},
+		{"four options, lastBid on 3rd place", []int{12345, 11037, 9000, 5000}, "C", "C is currently #3. Last place: D (down by 40.00)"},
+		{"four options, lastBid on 4th place", []int{12345, 11037, 9000, 5000}, "D", "D is still in last place (down by 40.00) usedShame"},
+		{"tie for last place", []int{500, 150, 150}, "A", "A is currently #1. Tie for last place: B, C (down by 3.50)"},
+		{"lastBid is tied for last", []int{500, 150, 150}, "B", "Tie for last place: B, C (down by 3.50)"},
+		{"first options are tied for last", []int{150, 150, 500}, "", "Tie for last place: A, B (down by 3.50)"},
+		{"all options tied", []int{150, 150, 150}, "", "Tie for last place: A, B, C (down by 0.00)"},
+		{"lastBid is tied, but not last place", []int{500, 300, 300, 100}, "C", "C is currently #2. Last place: D (down by 2.00)"},
+		{"one option", []int{999}, "", "A: 9.99"},
+		{"one option with lastBid", []int{999}, "A", "A: 9.99"},
+		{"zero options", []int{}, "", ""},
+	} {
+		var totals []Total
+		var lastBidOption Option
+		for n, cents := range tc.centsTotals {
+			name := string(rune(int('A') + n))
+			opt := Option{DisplayName: name, ShortCode: name}
+			if opt.ShortCode == tc.lastBid {
+				lastBidOption = opt
+			}
+			totals = append(totals, Total{
+				Option: opt,
+				Value:  donation.CentsValue(cents),
+			})
+		}
+		t.Run(tc.desc, func(t *testing.T) {
+			got := Totals{totals: totals, summaryStyle: "LAST_PLACE"}.Describe(lastBidOption)
 			if got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}

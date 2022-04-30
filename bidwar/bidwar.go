@@ -32,9 +32,18 @@ type Collection struct {
 // Contest is a single bid war between several options. The option that
 // receives the most money will win this contest.
 type Contest struct {
-	Name    string
+	// Display name for the contest.
+	Name string
+	// How to summarize the totals. This doesn't affect bid tallying behavior.
+	// It only changes how the current status of the bid war is reported to users.
+	// The default is "ALL": all options are reported, in descending order (i.e.,
+	// winning option first).
+	// TODO(aerion): Enum-ify this.
+	SummaryStyle string
+	// The options on which donors can bid money.
 	Options []Option
-	Closed  bool
+	// Whether this contest is accepting new bids.
+	Closed bool
 }
 
 // Option is a contestant in a bid war. Donors can allocate money to an option
@@ -181,21 +190,42 @@ func (b byCents) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b byCents) Less(i, j int) bool { return b[i].Value.Cents() < b[j].Value.Cents() }
 
 // Totals is a series of bid war Totals.
-type Totals []Total
+type Totals struct {
+	totals       []Total
+	summaryStyle string
+}
 
-func (tt Totals) String() string {
+// Describe returns a human-readable summary of the bid war. The description
+// will always mention the lastBid option, but may omit others for the sake
+// of brevity.
+func (tt Totals) Describe(lastBid Option) string {
+	switch tt.summaryStyle {
+	case "LAST_PLACE":
+		return tt.describeLastPlace(lastBid)
+	case "ALL":
+	}
+	return tt.describeAll()
+}
+
+func (tt Totals) openTotals() []Total {
+	var o []Total
+	for _, t := range tt.totals {
+		if !t.Option.Closed {
+			o = append(o, t)
+		}
+	}
+	return o
+}
+
+func (tt Totals) describeAll() string {
 	maxValue := donation.CentsValue(0)
-	for _, t := range tt {
+	for _, t := range tt.openTotals() {
 		if t.Value > maxValue {
 			maxValue = t.Value
 		}
 	}
 	var totalStrs []string
-	for _, t := range tt {
-		// Don't bother reporting totals that bidders can't change.
-		if t.Option.Closed {
-			continue
-		}
+	for _, t := range tt.openTotals() {
 		s := fmt.Sprintf("%s: %s", t.Option.DisplayName, t.Value)
 		if t.Value < maxValue {
 			s += fmt.Sprintf(" (down by %s)", maxValue-t.Value)
@@ -203,6 +233,59 @@ func (tt Totals) String() string {
 		totalStrs = append(totalStrs, s)
 	}
 	return strings.Join(totalStrs, ", ")
+}
+
+func (tt Totals) describeLastPlace(lastBid Option) string {
+	openTotals := tt.openTotals()
+	if len(openTotals) == 0 {
+		return ""
+	} else if len(openTotals) == 1 {
+		return fmt.Sprintf("%s: %s", openTotals[0].Option.DisplayName, openTotals[0].Value)
+	}
+
+	sort.Sort(byCents(openTotals))
+	minValue := openTotals[0].Value
+	// diff is the difference between the last-place option(s) and the
+	// next-lowest option.
+	diff := donation.CentsValue(0)
+	// lastBidRank is the rank of the lastBid option, with #1 being the option
+	// with the most money.
+	lastBidRank := 1
+	lastBidValue := -1
+	lastBidIsLastPlace := false
+	var lastPlaceOpts []string
+	for _, t := range openTotals {
+		if t.Value == minValue {
+			lastPlaceOpts = append(lastPlaceOpts, t.Option.DisplayName)
+			if !lastBid.IsZero() && t.Option.ShortCode == lastBid.ShortCode {
+				lastBidIsLastPlace = true
+			}
+		} else if diff == 0 {
+			diff = t.Value - minValue
+		}
+		if !lastBid.IsZero() && t.Option.ShortCode == lastBid.ShortCode {
+			lastBidValue = t.Value.Cents()
+		}
+		if lastBidValue >= 0 && t.Value.Cents() > lastBidValue {
+			lastBidRank += 1
+		}
+	}
+
+	// A special message for when the bidder's choice was in last place, and
+	// remains in last place despite their efforts.
+	if len(lastPlaceOpts) == 1 && lastPlaceOpts[0] == lastBid.DisplayName {
+		return fmt.Sprintf("%s is still in last place (down by %s) usedShame", lastPlaceOpts[0], diff)
+	}
+
+	desc := "Last place: "
+	if len(lastPlaceOpts) > 1 {
+		desc = "Tie for last place: "
+	}
+	desc += fmt.Sprintf("%s (down by %s)", strings.Join(lastPlaceOpts, ", "), diff)
+	if !lastBid.IsZero() && !lastBidIsLastPlace {
+		desc = fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank, desc)
+	}
+	return desc
 }
 
 // UpdateStats summarizes the changes made to a bid war.
@@ -346,7 +429,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) (UpdateStats, e
 func (t Tallier) TotalsForContest(contest Contest) (Totals, error) {
 	totals, err := t.GetTotals()
 	if err != nil {
-		return nil, err
+		return Totals{}, err
 	}
 	optsByName := make(map[string]Option)
 	for _, opt := range contest.Options {
@@ -359,7 +442,10 @@ func (t Tallier) TotalsForContest(contest Contest) (Totals, error) {
 		}
 	}
 	sort.Sort(sort.Reverse(byCents(totalsForContest)))
-	return totalsForContest, nil
+	return Totals{
+		totals:       totalsForContest,
+		summaryStyle: contest.SummaryStyle,
+	}, nil
 }
 
 // makeChoice decides which rows in the given ValueRange need to be edited in

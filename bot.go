@@ -186,11 +186,11 @@ func (b *bot) shouldIgnoreSubGift(ev donation.Event) bool {
 func (b *bot) getNewTotals(opt bidwar.Option) (bidwar.Totals, error) {
 	contest := b.bidwars.FindContest(opt)
 	if contest.Name == "" {
-		return nil, fmt.Errorf("could not find bid war for option %q", opt.ShortCode)
+		return bidwar.Totals{}, fmt.Errorf("could not find bid war for option %q", opt.ShortCode)
 	}
 	totals, err := b.bidwarTallier.TotalsForContest(contest)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching current bid war totals: %v", err)
+		return bidwar.Totals{}, fmt.Errorf("error fetching current bid war totals: %v", err)
 	}
 	return totals, nil
 }
@@ -218,7 +218,7 @@ func (b *bot) sayWithTotals(channel string, opt bidwar.Option, msgPrefix string)
 		log.Printf("ERROR reading new bid war totals: %v", err)
 		return
 	}
-	msg := totals.String()
+	msg := totals.Describe(opt)
 	if msgPrefix != "" {
 		msg = msgPrefix + " " + msg
 	}

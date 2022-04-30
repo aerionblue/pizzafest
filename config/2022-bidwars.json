@@ -2,6 +2,7 @@
     "contests": [
         {
             "name": "Greatest Hits",
+            "summaryStyle": "LAST_PLACE",
             "options": [
                 {
                     "displayName": "Hybrid Heaven",
