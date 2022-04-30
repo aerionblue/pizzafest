@@ -140,6 +140,9 @@ func (w *Watcher) processTipLog(path string) ([]logEntry, error) {
 			log.Printf("error parsing line: %v", err)
 			continue
 		}
+		if entry.IsZero() {
+			continue
+		}
 		if isOld := w.processedIDs[entry.ID]; !isOld {
 			w.processedIDs[entry.ID] = true
 			newEntries = append(newEntries, entry)
@@ -160,7 +163,14 @@ type logEntry struct {
 	Message  string
 }
 
+func (e logEntry) IsZero() bool {
+	return e.ID == ""
+}
+
 func parseTipLogLine(line string) (logEntry, error) {
+	if line == "" {
+		return logEntry{}, nil
+	}
 	tokens := strings.SplitN(line, logLineDelimiter, 4)
 	for len(tokens) < 4 {
 		tokens = append(tokens, "")
