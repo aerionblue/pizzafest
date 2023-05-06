@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"regexp"
 	"sort"
 	"strconv"
@@ -23,6 +24,9 @@ import (
 // CreateDeveloperMetadata requests to the API in order to set this up.
 const metadataBidWarNames = "bidWarNames"
 const metadataBidWarTotals = "bidWarTotals"
+
+// Special directives users can use when selecting a bid war option.
+var randomDirective = regexp.MustCompile("(?i)random")
 
 // Collection is a set of bid wars.
 type Collection struct {
@@ -105,7 +109,8 @@ func (c Collection) AllOpenOptions() []Option {
 func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 	minIndex := -1
 	minOpt := Option{}
-	for _, opt := range c.AllOpenOptions() {
+	openOptions := c.AllOpenOptions()
+	for _, opt := range openOptions {
 		for _, a := range opt.Aliases {
 			if loc := a.FindStringIndex(msg); loc != nil {
 				idx := loc[0]
@@ -115,6 +120,10 @@ func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
 				}
 			}
 		}
+	}
+	if minIndex < 0 && randomDirective.MatchString(msg) {
+		randIdx := rand.Intn(len(openOptions))
+		minOpt = openOptions[randIdx]
 	}
 	return Choice{Option: minOpt, Reason: reasonString(reason, msg)}
 }

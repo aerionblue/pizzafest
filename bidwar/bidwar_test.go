@@ -2,6 +2,8 @@ package bidwar
 
 import (
 	"fmt"
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/aerionblue/pizzafest/donation"
@@ -53,6 +55,41 @@ func TestChoiceFromMessage(t *testing.T) {
 			got := bidwars.ChoiceFromMessage(tc.msg, FromChatMessage)
 			if got.Option.ShortCode != tc.want {
 				t.Errorf("got %q, want %q", got.Option.ShortCode, tc.want)
+			}
+		})
+	}
+}
+
+func TestChoiceFromMessageRandom(t *testing.T) {
+	bidwars, err := Parse([]byte(testJSON))
+	if err != nil {
+		t.Fatalf("error parsing test data: %v", err)
+	}
+
+	for _, tc := range []struct {
+		desc  string
+		msg   string
+		wants []string // The ShortCodes of all Options that should appear when ChoiceFromMessage is run many times
+	}{
+		{"choose randomly", "random", []string{"Moo", "NBC", "DMC1", "DMC2", "DMC3"}},
+		{"random directive is case-insensitive", "RANdoM", []string{"Moo", "NBC", "DMC1", "DMC2", "DMC3"}},
+		{"accept specific option over random choice", "random but actually pick moo moo", []string{"Moo"}},
+		{"'random' can appear in any substring", "please pick randomly", []string{"Moo", "NBC", "DMC1", "DMC2", "DMC3"}},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			gotCodes := make(map[string]int)
+			for i := 0; i < 100; i++ {
+				got := bidwars.ChoiceFromMessage(tc.msg, FromChatMessage)
+				gotCodes[got.Option.ShortCode] += 1
+			}
+			gots := make([]string, 0, len(gotCodes))
+			for key, _ := range gotCodes {
+				gots = append(gots, key)
+			}
+			sort.Strings(gots)
+			sort.Strings(tc.wants)
+			if !reflect.DeepEqual(gots, tc.wants) {
+				t.Errorf("got keys %v, want keys %v", gotCodes, tc.wants)
 			}
 		})
 	}
