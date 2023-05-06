@@ -231,6 +231,11 @@ type bidPreference struct {
 	Expiration time.Time
 }
 
+func firstTokenIs(message, target string) bool {
+	tokens := strings.Split(message, " ")
+	return len(tokens) > 0 && tokens[0] == target
+}
+
 func doLocalTest(b *bot, channel string, ircClient *twitch.Client, tallier *bidwar.Tallier) {
 	<-time.After(2 * time.Second)
 	ircClient.Say(channel, "subgift --tier 2 --months 6 --username aerionblue --username2 AEWC20XX")
@@ -369,7 +374,7 @@ func main() {
 	ircClient.OnPrivateMessage(func(m twitch.PrivateMessage) {
 		if ev, ok := donation.ParseBitsEvent(m); ok {
 			b.dispatchBitsEvent(ev)
-		} else if strings.HasPrefix(strings.ToLower(m.Message), bidCommand) {
+		} else if firstTokenIs(strings.ToLower(m.Message), bidCommand) {
 			b.dispatchBidCommand(m)
 		}
 	})
