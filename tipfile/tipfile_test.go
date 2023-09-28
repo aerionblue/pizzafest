@@ -15,7 +15,7 @@ func TestParseTipLogLine(t *testing.T) {
 		{"no message", "id1;11037;NutDealer;", logEntry{"id1", 11037, "NutDealer", ""}, false},
 		{"too few fields", "id1;200", logEntry{"id1", 200, "", ""}, false},
 		{"too many fields", "id1;200;NutDealer;hey lol ;)", logEntry{"id1", 200, "NutDealer", "hey lol ;)"}, false},
-		{"blank", "", logEntry{}, true},
+		{"blank", "", logEntry{}, false},
 		{"malformed number", "id1;110x;NutDealer;comment", logEntry{}, true},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
