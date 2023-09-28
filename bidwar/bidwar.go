@@ -31,6 +31,9 @@ var randomDirective = regexp.MustCompile("(?i)random")
 // Collection is a set of bid wars.
 type Collection struct {
 	Contests []Contest
+	// Whether to ONLY accept bids via explicit chat command. Defaults to
+	// false, i.e., bids will be inferred from resub messages, etc.
+	RequireExplicitBid bool
 }
 
 // Contest is a single bid war between several options. The option that
@@ -94,9 +97,14 @@ type Choice struct {
 type ChoiceReason int
 
 const (
+	// The bid choice was read from a chat message with money attached.
 	FromChatMessage ChoiceReason = iota
+	// The bid choice was read from a non-chat donation message.
 	FromDonationMessage
+	// The bid choice was read from a chat message in a resub notice.
 	FromSubMessage
+	// The bid choice was read from an explicit !bid command.
+	FromBidCommand
 )
 
 // AllOpenOptions returns a list of all open Options in all open Contests.
@@ -123,6 +131,9 @@ func (c Collection) AllOpenOptions() []Option {
 // more than one Option matches, returns the match that occurs earliest
 // (leftmost) in the message.
 func (c Collection) ChoiceFromMessage(msg string, reason ChoiceReason) Choice {
+	if c.RequireExplicitBid && reason != FromBidCommand {
+		return Choice{}
+	}
 	minIndex := -1
 	minOpt := Option{}
 	openOptions := c.AllOpenOptions()
@@ -464,7 +475,7 @@ func (t Tallier) AssignFromMessage(donor string, message string) (UpdateStats, e
 	if donor == "" {
 		return UpdateStats{}, errors.New("donor must not be empty")
 	}
-	choice := t.collection.ChoiceFromMessage(message, FromChatMessage)
+	choice := t.collection.ChoiceFromMessage(message, FromBidCommand)
 	if choice.Option.IsZero() {
 		return UpdateStats{}, nil
 	}
