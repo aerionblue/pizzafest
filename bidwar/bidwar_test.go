@@ -276,3 +276,42 @@ func TestTotalsToString_WinnersStyle(t *testing.T) {
 		})
 	}
 }
+
+func TestParseJSONConfig_DefaultValues(t *testing.T) {
+	bidwars, err := Parse([]byte(`{
+	    "contests": [
+	        {
+	            "name": "test of default config values",
+	            "options": [
+	                {"displayName": "A", "shortCode": "A", "aliases": []},
+	                {"displayName": "B", "shortCode": "B", "aliases": []}
+	            ]
+	        },
+	        {
+	            "name": "test that config values are overridden",
+	            "summaryStyle": "WINNERS",
+	            "numberOfWinners": 5,
+	            "options": [
+	                {"displayName": "A", "shortCode": "A", "aliases": []},
+	                {"displayName": "B", "shortCode": "B", "aliases": []}
+	            ]
+	        }
+	    ]
+	}
+	`))
+	if err != nil {
+		t.Errorf("parse failed")
+	}
+	if got := bidwars.Contests[0].SummaryStyle; got != "ALL" {
+		t.Errorf("wrong default value of SummaryStyle: got %s, want ALL", got)
+	}
+	if got := bidwars.Contests[0].NumberOfWinners; got != 1 {
+		t.Errorf("wrong default value of NumberOfWinners: got %d, want 1", got)
+	}
+	if got := bidwars.Contests[1].SummaryStyle; got != "WINNERS" {
+		t.Errorf("wrong parsed value of SummaryStyle: got %s, want WINNERS", got)
+	}
+	if got := bidwars.Contests[1].NumberOfWinners; got != 5 {
+		t.Errorf("wrong parsed value of NumberOfWinners: got %d, want 5", got)
+	}
+}

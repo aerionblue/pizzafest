@@ -53,6 +53,19 @@ type Contest struct {
 	Closed bool
 }
 
+func (c *Contest) UnmarshalJSON(data []byte) error {
+	type withDefaults Contest
+	newC := &withDefaults{
+		SummaryStyle:    "ALL",
+		NumberOfWinners: 1,
+	}
+	if err := json.Unmarshal(data, newC); err != nil {
+		return err
+	}
+	*c = Contest(*newC)
+	return nil
+}
+
 // Option is a contestant in a bid war. Donors can allocate money to an option
 // to help it win its bid war.
 type Option struct {
