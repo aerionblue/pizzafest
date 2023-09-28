@@ -44,6 +44,9 @@ type Contest struct {
 	// winning option first).
 	// TODO(aerion): Enum-ify this.
 	SummaryStyle string
+	// How many of the options will win. Only used if the summary style
+	// is "WINNERS".
+	NumberOfWinners int
 	// The options on which donors can bid money.
 	Options []Option
 	// Whether this contest is accepting new bids.
@@ -200,8 +203,9 @@ func (b byCents) Less(i, j int) bool { return b[i].Value.Cents() < b[j].Value.Ce
 
 // Totals is a series of bid war Totals.
 type Totals struct {
-	totals       []Total
-	summaryStyle string
+	totals          []Total
+	summaryStyle    string
+	numberOfWinners int
 }
 
 // Describe returns a human-readable summary of the bid war. The description
@@ -211,6 +215,8 @@ func (tt Totals) Describe(lastBid Option) string {
 	switch tt.summaryStyle {
 	case "LAST_PLACE":
 		return tt.describeLastPlace(lastBid)
+	case "WINNERS":
+		return tt.describeWinners(lastBid)
 	case "ALL":
 	}
 	return tt.describeAll()
@@ -292,6 +298,50 @@ func (tt Totals) describeLastPlace(lastBid Option) string {
 	}
 	desc += fmt.Sprintf("%s (down by %s)", strings.Join(lastPlaceOpts, ", "), diff)
 	if !lastBid.IsZero() && !lastBidIsLastPlace {
+		desc = fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank, desc)
+	}
+	return desc
+}
+
+func (tt Totals) describeWinners(lastBid Option) string {
+	openTotals := tt.openTotals()
+	if len(openTotals) == 0 {
+		return ""
+	} else if len(openTotals) == 1 {
+		return fmt.Sprintf("%s: %s", openTotals[0].Option.DisplayName, openTotals[0].Value)
+	}
+
+	sort.Sort(sort.Reverse(byCents(openTotals)))
+
+	var threshold donation.CentsValue
+	if len(openTotals) > tt.numberOfWinners {
+		threshold = openTotals[tt.numberOfWinners-1].Value
+	} else {
+		threshold = openTotals[len(openTotals)-1].Value
+	}
+
+	lastBidValue := -1
+	if !lastBid.IsZero() {
+		for _, t := range openTotals {
+			if t.Option.ShortCode == lastBid.ShortCode {
+				lastBidValue = t.Value.Cents()
+				break
+			}
+		}
+	}
+	lastBidRank := 1
+	var leadingOpts []string
+	for _, t := range openTotals {
+		if t.Value >= threshold {
+			leadingOpts = append(leadingOpts, t.Option.DisplayName)
+		}
+		if lastBidValue >= 0 && t.Value.Cents() > lastBidValue {
+			lastBidRank += 1
+		}
+	}
+
+	desc := fmt.Sprintf("Current top %d: %s", tt.numberOfWinners, strings.Join(leadingOpts, ", "))
+	if !lastBid.IsZero() {
 		desc = fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank, desc)
 	}
 	return desc
@@ -452,8 +502,9 @@ func (t Tallier) TotalsForContest(contest Contest) (Totals, error) {
 	}
 	sort.Sort(sort.Reverse(byCents(totalsForContest)))
 	return Totals{
-		totals:       totalsForContest,
-		summaryStyle: contest.SummaryStyle,
+		totals:          totalsForContest,
+		summaryStyle:    contest.SummaryStyle,
+		numberOfWinners: contest.NumberOfWinners,
 	}, nil
 }
 

@@ -156,7 +156,7 @@ func TestMakeChoice(t *testing.T) {
 	}
 }
 
-func TestTotalsToString(t *testing.T) {
+func TestTotalsToString_AllStyle(t *testing.T) {
 	for _, tc := range []struct {
 		desc        string
 		centsTotals []int
@@ -185,7 +185,7 @@ func TestTotalsToString(t *testing.T) {
 	}
 }
 
-func TestTotalsToStringLastPlaceStyle(t *testing.T) {
+func TestTotalsToString_LastPlaceStyle(t *testing.T) {
 	for _, tc := range []struct {
 		desc        string
 		centsTotals []int
@@ -225,6 +225,51 @@ func TestTotalsToStringLastPlaceStyle(t *testing.T) {
 		}
 		t.Run(tc.desc, func(t *testing.T) {
 			got := Totals{totals: totals, summaryStyle: "LAST_PLACE"}.Describe(lastBidOption)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTotalsToString_WinnersStyle(t *testing.T) {
+	for _, tc := range []struct {
+		desc        string
+		winners     int
+		centsTotals []int
+		lastBid     string
+		want        string
+	}{
+		{"top 2 out of 3", 2, []int{200, 100, 300}, "", "Current top 2: C, A"},
+		{"top 3 out of 3", 3, []int{200, 100, 300}, "", "Current top 3: C, A, B"},
+		{"2 of 3, lastBid for leader", 2, []int{200, 100, 300}, "C", "C is currently #1. Current top 2: C, A"},
+		{"2 of 3, lastBid for trailer", 2, []int{200, 100, 300}, "B", "B is currently #3. Current top 2: C, A"},
+		{"2 of 3, 2-way tie for #1", 2, []int{200, 300, 300}, "C", "C is currently #1. Current top 2: B, C"},
+		{"2 of 3, 2-way tie for #2", 2, []int{200, 200, 300}, "B", "B is currently #2. Current top 2: C, A, B"},
+		{"more winners than options", 10, []int{100, 300}, "", "Current top 10: B, A"},
+		{"one option", 1, []int{999}, "", "A: 9.99"},
+		{"one option with lastBid", 1, []int{999}, "A", "A: 9.99"},
+		{"zero options", 1, []int{}, "", ""},
+	} {
+		var totals []Total
+		var lastBidOption Option
+		for n, cents := range tc.centsTotals {
+			name := string(rune(int('A') + n))
+			opt := Option{DisplayName: name, ShortCode: name}
+			if opt.ShortCode == tc.lastBid {
+				lastBidOption = opt
+			}
+			totals = append(totals, Total{
+				Option: opt,
+				Value:  donation.CentsValue(cents),
+			})
+		}
+		t.Run(tc.desc, func(t *testing.T) {
+			got := Totals{
+				totals:          totals,
+				summaryStyle:    "WINNERS",
+				numberOfWinners: tc.winners,
+			}.Describe(lastBidOption)
 			if got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
