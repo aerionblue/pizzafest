@@ -12,6 +12,8 @@ import (
 
 	twitch "github.com/gempir/go-twitch-irc/v2"
 
+	"golang.org/x/time/rate"
+
 	"github.com/aerionblue/pizzafest/bidwar"
 	"github.com/aerionblue/pizzafest/db"
 	"github.com/aerionblue/pizzafest/donation"
@@ -25,8 +27,9 @@ const testIRCAddress = "irc.fdgt.dev:6667"
 
 const bidCommand = "!bid"
 
-// Minimum duration between outgoing chat messages.
+// Rate limit parameters for outgoing chat messages.
 const chatCooldown = 1 * time.Second
+const chatBucketSize = 10
 
 // How long we remember a user's !bid preference.
 const bidPrefTTL = 3 * time.Minute
@@ -46,6 +49,7 @@ type bot struct {
 	bidwars           bidwar.Collection
 	bidwarTallier     *bidwar.Tallier
 	minimumDonation   donation.CentsValue
+	chatLimiter       *rate.Limiter
 
 	mu sync.RWMutex
 	// Maps a Twitch username to the last time they gave a community gift sub.
@@ -53,8 +57,7 @@ type bot struct {
 	// Maps a Twitch username to a bid war preference. When a user uses !bid but
 	// has no donations to assign, we keep track of it for a few minutes just in
 	// case the donation data was slow in getting to us.
-	pendingBids  map[string]*bidPreference
-	lastChatTime time.Time
+	pendingBids map[string]*bidPreference
 }
 
 func (b *bot) dispatchSubEvent(ev donation.Event) {
@@ -196,14 +199,11 @@ func (b *bot) getNewTotals(opt bidwar.Option) (bidwar.Totals, error) {
 }
 
 func (b *bot) say(channel string, msg string) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	if b.lastChatTime.Add(chatCooldown).After(time.Now()) {
+	if !b.chatLimiter.Allow() {
 		log.Printf("[on cooldown for #%v] %v", channel, msg)
 		return
 	}
 	log.Printf("[-> #%v] %v", channel, msg)
-	b.lastChatTime = time.Now()
 	if b.ircRepliesEnabled {
 		b.ircClient.Say(channel, msg)
 	}
@@ -362,6 +362,7 @@ func main() {
 		bidwars:           bidwars,
 		bidwarTallier:     bidwarTallier,
 		minimumDonation:   minimumDonation,
+		chatLimiter:       rate.NewLimiter(rate.Every(chatCooldown), chatBucketSize),
 		communityGifts:    make(map[string]time.Time),
 		pendingBids:       make(map[string]*bidPreference),
 	}

@@ -10,5 +10,6 @@ require (
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/google/go-cmp v0.5.4
 	golang.org/x/oauth2 v0.0.0-20210218202405-ba52d332ba99
+	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/api v0.40.0
 )
