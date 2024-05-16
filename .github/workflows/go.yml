@@ -4,8 +4,9 @@
 name: Go
 
 permissions:
-  id-token: write
   attestations: write
+  id-token: write
+  packages: write
 
 on:
   push:
