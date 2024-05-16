@@ -16,8 +16,11 @@ const (
 	msgParamSubPlan           string = "msg-param-sub-plan"
 	msgParamRecipientUserName        = "msg-param-recipient-user-name"
 	msgParamMassGiftCount            = "msg-param-mass-gift-count"
-	// fdgt sends "msg-params-gift-months" (plural params). Not sure whether that's accurate...
-	msgParamGiftMonths = "msg-param-gift-months"
+	msgParamGiftMonths               = "msg-param-gift-months"
+	// Whether a resub was part of a multi-month gift sub. The msg-param-gift-month-being-redeemed
+	// parameter will also be present on the message, indicating how many months of the original
+	// gift have passed (e.g., this is month 7 of a 12-month gift).
+	msgParamWasGifted = "msg-param-was-gifted"
 )
 
 // Legal values for the msgParamSubPlan param.
@@ -176,6 +179,7 @@ func ParseSubEvent(m twitch.UserNoticeMessage) (Event, bool) {
 		Type: eventType, SubCount: 1, SubMonths: 1,
 		Message: m.Message,
 	}
+	wasGifted := false
 	for name, value := range m.MsgParams {
 		switch name {
 		case msgParamSubPlan:
@@ -187,6 +191,8 @@ func ParseSubEvent(m twitch.UserNoticeMessage) (Event, bool) {
 				n = 1
 			}
 			ev.SubMonths = n
+		case msgParamWasGifted:
+			wasGifted = true
 		case msgParamMassGiftCount:
 			n, err := strconv.Atoi(value)
 			if err != nil {
@@ -195,6 +201,11 @@ func ParseSubEvent(m twitch.UserNoticeMessage) (Event, bool) {
 			}
 			ev.SubCount = n
 		}
+	}
+	if wasGifted {
+		// If a user receives an N-month gift, they can send N resub messages, all of which
+		// carry the original gift month count. Each event should only count for 1 month.
+		ev.SubMonths = 1
 	}
 	return ev, true
 }
