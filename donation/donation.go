@@ -17,10 +17,12 @@ const (
 	msgParamRecipientUserName        = "msg-param-recipient-user-name"
 	msgParamMassGiftCount            = "msg-param-mass-gift-count"
 	msgParamGiftMonths               = "msg-param-gift-months"
-	// Whether a resub was part of a multi-month gift sub. The msg-param-gift-month-being-redeemed
-	// parameter will also be present on the message, indicating how many months of the original
-	// gift have passed (e.g., this is month 7 of a 12-month gift).
-	msgParamWasGifted = "msg-param-was-gifted"
+	// Whether a resub was part of a multi-month gift sub. The
+	// msg-param-gift-month-being-redeemed parameter indicates how many
+	// months of the original gift have passed (e.g., this is month 7 of a
+	// 12-month gift).
+	msgParamWasGifted              = "msg-param-was-gifted"
+	msgParamGiftMonthBeingRedeemed = "msg-param-gift-month-being-redeemed"
 )
 
 // Legal values for the msgParamSubPlan param.
@@ -192,6 +194,11 @@ func ParseSubEvent(m twitch.UserNoticeMessage) (Event, bool) {
 			}
 			ev.SubMonths = n
 		case msgParamWasGifted:
+			fallthrough
+		case msgParamGiftMonthBeingRedeemed:
+			// I'm not sure when exactly either of these parameters is set on
+			// gifted resubs. It doesn't happen that often, so it's kind of
+			// annoying to verify. Let's just look for both.
 			wasGifted = true
 		case msgParamMassGiftCount:
 			n, err := strconv.Atoi(value)
