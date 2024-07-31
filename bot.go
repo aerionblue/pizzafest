@@ -18,6 +18,7 @@ import (
 	"github.com/aerionblue/pizzafest/db"
 	"github.com/aerionblue/pizzafest/donation"
 	"github.com/aerionblue/pizzafest/googlesheets"
+	"github.com/aerionblue/pizzafest/streamelements"
 	"github.com/aerionblue/pizzafest/streamlabs"
 	"github.com/aerionblue/pizzafest/tipfile"
 	"github.com/aerionblue/pizzafest/twitchchat"
@@ -264,6 +265,7 @@ func main() {
 	firestoreCredsPath := flag.String("firestore_creds", "", "Path to the Firestore credentials file")
 	sheetsCredsPath := flag.String("sheets_creds", "", "Path to the Google Sheets OAuth client secret file")
 	sheetsTokenPath := flag.String("sheets_token", "", "Path to the Google Sheets OAuth token. If absent, you will be prompted to create a new token")
+	streamelementsCredsPath := flag.String("streamelements_creds", "", "Path to a StreamElements config file. If absent, StreamElements donation checking will be disabled")
 	streamlabsCredsPath := flag.String("streamlabs_creds", "", "Path to a Streamlabs OAuth token. If absent, Streamlabs donation checking will be disabled")
 	tipLogPath := flag.String("tip_log_path", "", "Path to a text file where some other process is logging incoming donations")
 	bidWarDataPath := flag.String("bidwar_data", "", "Path to a JSON file describing the current bid wars")
@@ -309,7 +311,8 @@ func main() {
 	}
 
 	var dbRecorder db.Recorder
-	var donationPoller *streamlabs.DonationPoller
+	var seDonationPoller *streamelements.DonationPoller
+	var slDonationPoller *streamlabs.DonationPoller
 	var tipWatcher *tipfile.Watcher
 	var bidwarTallier *bidwar.Tallier
 	if *sheetsCredsPath != "" {
@@ -338,9 +341,18 @@ func main() {
 	} else {
 		log.Fatal("no DB config specified; you must provide either Firestore or Google Sheets flags")
 	}
+	if *streamelementsCredsPath != "" {
+		var err error
+		seDonationPoller, err = streamelements.NewDonationPoller(context.Background(), *streamelementsCredsPath, *targetChannel)
+		if err != nil {
+			log.Printf("(non-fatal) error initializing StreamElements polling: %v", err)
+		}
+	} else {
+		log.Print("no StreamElements token provided")
+	}
 	if *streamlabsCredsPath != "" {
 		var err error
-		donationPoller, err = streamlabs.NewDonationPoller(context.Background(), *streamlabsCredsPath, *targetChannel)
+		slDonationPoller, err = streamlabs.NewDonationPoller(context.Background(), *streamlabsCredsPath, *targetChannel)
 		if err != nil {
 			log.Printf("(non-fatal) error initializing Streamlabs polling: %v", err)
 		}
@@ -381,11 +393,19 @@ func main() {
 	})
 	ircClient.Join(*targetChannel)
 
-	if donationPoller != nil {
-		donationPoller.OnDonation(func(ev donation.Event) {
+	if seDonationPoller != nil {
+		seDonationPoller.OnDonation(func(ev donation.Event) {
 			b.dispatchMoneyDonation(ev)
 		})
-		if err := donationPoller.Start(); err != nil {
+		if err := seDonationPoller.Start(); err != nil {
+			log.Fatalf("StreamElements polling error: %v", err)
+		}
+	}
+	if slDonationPoller != nil {
+		slDonationPoller.OnDonation(func(ev donation.Event) {
+			b.dispatchMoneyDonation(ev)
+		})
+		if err := slDonationPoller.Start(); err != nil {
 			log.Fatalf("Streamlabs polling error: %v", err)
 		}
 	}
