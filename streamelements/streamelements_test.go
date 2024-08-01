@@ -57,7 +57,6 @@ func TestParseDonationResponse(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Log(tc.jsonResp)
 			evs, times, err := parseDonationResponse([]byte(tc.jsonResp), "testing")
 			if err != nil {
 				t.Errorf("error parsing json: %v", err)
