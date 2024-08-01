@@ -43,10 +43,11 @@ const (
 type SubTier int
 
 const (
-	unknownTier SubTier = 0
-	SubTier1            = 1
-	SubTier2            = 2
-	SubTier3            = 3
+	unknownTier  SubTier = 0
+	SubTier1             = 1
+	SubTier2             = 2
+	SubTier3             = 3
+	SubTierPrime         = 101
 )
 
 func (s SubTier) Marshal() int {
@@ -61,6 +62,8 @@ func (s SubTier) description() string {
 		return "Tier 2"
 	case SubTier3:
 		return "Tier 3"
+	case SubTierPrime:
+		return "Prime"
 	}
 	return "unknown"
 }
@@ -74,6 +77,8 @@ func UnmarshalSubTier(n int) SubTier {
 		return SubTier2
 	case 3:
 		return SubTier3
+	case 101:
+		return SubTierPrime
 	}
 	return unknownTier
 }
@@ -81,7 +86,9 @@ func UnmarshalSubTier(n int) SubTier {
 // parseSubTier converts the sub tier parameter from a Twitch IRC message to a SubTier.
 func parseSubTier(s string) SubTier {
 	switch s {
-	case subPlanPrime, subPlanTier1:
+	case subPlanPrime:
+		return SubTierPrime
+	case subPlanTier1:
 		return SubTier1
 	case subPlanTier2:
 		return SubTier2
@@ -124,10 +131,12 @@ func (e Event) Value() CentsValue {
 func (e Event) SubCentsValue() int {
 	baseValue := 0
 	switch e.SubTier {
-	case SubTier1:
+	case SubTierPrime:
 		baseValue = 500
+	case SubTier1:
+		baseValue = 600
 	case SubTier2:
-		baseValue = 1000
+		baseValue = 1200
 	case SubTier3:
 		baseValue = 2500
 	}

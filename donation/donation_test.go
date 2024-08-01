@@ -9,12 +9,13 @@ func TestValue(t *testing.T) {
 		ev   Event
 		want CentsValue
 	}{
-		{Event{SubTier: SubTier1, SubCount: 1, SubMonths: 1}, 500},
-		{Event{SubTier: SubTier1, SubCount: 5, SubMonths: 1}, 2500},
-		{Event{SubTier: SubTier1, SubCount: 1, SubMonths: 6}, 3000},
-		{Event{SubTier: SubTier1, SubCount: 5, SubMonths: 6}, 15000},
-		{Event{SubTier: SubTier2, SubCount: 1, SubMonths: 1}, 1000},
-		{Event{SubTier: SubTier2, SubCount: 1, SubMonths: 6}, 6000},
+		{Event{SubTier: SubTierPrime, SubCount: 1, SubMonths: 1}, 500},
+		{Event{SubTier: SubTier1, SubCount: 1, SubMonths: 1}, 600},
+		{Event{SubTier: SubTier1, SubCount: 5, SubMonths: 1}, 3000},
+		{Event{SubTier: SubTier1, SubCount: 1, SubMonths: 6}, 3600},
+		{Event{SubTier: SubTier1, SubCount: 5, SubMonths: 6}, 18000},
+		{Event{SubTier: SubTier2, SubCount: 1, SubMonths: 1}, 1200},
+		{Event{SubTier: SubTier2, SubCount: 1, SubMonths: 6}, 7200},
 		{Event{SubTier: SubTier3, SubCount: 1, SubMonths: 1}, 2500},
 		{Event{SubTier: SubTier3, SubCount: 12, SubMonths: 1}, 30000},
 		{Event{Bits: 420}, 420},
