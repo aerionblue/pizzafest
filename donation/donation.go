@@ -9,8 +9,6 @@ import (
 	twitch "github.com/gempir/go-twitch-irc/v2"
 )
 
-const subCentsValue = 500
-
 // USERNOTICE message param tag names. See https://dev.twitch.tv/docs/irc/tags for param descriptions.
 const (
 	msgParamSubPlan           string = "msg-param-sub-plan"
@@ -53,18 +51,6 @@ const (
 
 func (s SubTier) Marshal() int {
 	return int(s)
-}
-
-func (s SubTier) multiplier() int {
-	switch s {
-	case SubTier1:
-		return 1
-	case SubTier2:
-		return 2
-	case SubTier3:
-		return 5
-	}
-	return 0
 }
 
 func (s SubTier) description() string {
@@ -131,12 +117,21 @@ type Event struct {
 // CentsValue returns the value that this event should contribute to a bid war,
 // in US cents.
 func (e Event) Value() CentsValue {
-	return CentsValue(subCentsValue*e.SubValue() + e.Bits + e.Cash.Cents())
+	return CentsValue(e.SubCentsValue() + e.Bits + e.Cash.Cents())
 }
 
-// SubValue returns this event's equivalent value in Tier 1 subscriptions.
-func (e Event) SubValue() int {
-	return e.SubTier.multiplier() * e.SubMonths * e.SubCount
+// SubCentsValue returns this event's equivalent value in cents.
+func (e Event) SubCentsValue() int {
+	baseValue := 0
+	switch e.SubTier {
+	case SubTier1:
+		baseValue = 500
+	case SubTier2:
+		baseValue = 1000
+	case SubTier3:
+		baseValue = 2500
+	}
+	return baseValue * e.SubMonths * e.SubCount
 }
 
 // Description returns a human-readable description of the event.
