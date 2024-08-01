@@ -21,7 +21,7 @@ func TestValue(t *testing.T) {
 		{Event{Cash: CentsValue(501)}, 501},
 	} {
 		if got := tc.ev.Value(); got != tc.want {
-			t.Errorf("wrong value for %v; got %v, want %v", tc.ev, got, tc.want)
+			t.Errorf("wrong value for %+v; got %v, want %v", tc.ev, got, tc.want)
 		}
 	}
 }
