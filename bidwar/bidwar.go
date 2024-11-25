@@ -274,57 +274,82 @@ func (tt Totals) describeAll() string {
 	return strings.Join(totalStrs, ", ")
 }
 
-func (tt Totals) describeLastPlace(lastBid Option) string {
+type optionRank struct {
+	// The rank that these options occupy, with 1 being the most valuable.
+	rank int
+	// One or more options. These options are all tied for the specified rank.
+	options []Option
+	// The monetary. Every Option has this same value.
+	value donation.CentsValue
+}
+
+// Returns all open Options and their ordinal ranks, ordered from highest
+// value to lowest value. Options with equal values are returned in the same
+// optionRank.
+func (tt Totals) computeRanks() []*optionRank {
 	openTotals := tt.openTotals()
 	if len(openTotals) == 0 {
+		return nil
+	}
+
+	sort.Sort(sort.Reverse(byCents(openTotals)))
+	var ranks []*optionRank
+	for idx, t := range openTotals {
+		if ranks == nil || ranks[len(ranks)-1].value != t.Value {
+			ranks = append(ranks, &optionRank{
+				rank:  idx + 1,
+				value: t.Value,
+			})
+		}
+		lastRank := ranks[len(ranks)-1]
+		lastRank.options = append(lastRank.options, t.Option)
+	}
+	return ranks
+}
+
+func (tt Totals) describeLastPlace(lastBid Option) string {
+	ranks := tt.computeRanks()
+	if len(ranks) == 0 {
 		return ""
-	} else if len(openTotals) == 1 {
-		return fmt.Sprintf("%s: %s", openTotals[0].Option.DisplayName, openTotals[0].Value)
+	} else if len(ranks) == 1 {
+		if opts := ranks[0].options; len(opts) == 1 {
+			return fmt.Sprintf("%s: %s", opts[0].DisplayName, ranks[0].value)
+		}
 	}
 
-	sort.Sort(byCents(openTotals))
-	minValue := openTotals[0].Value
-	// diff is the difference between the last-place option(s) and the
-	// next-lowest option.
+	lastPlaceRank := ranks[len(ranks)-1]
 	diff := donation.CentsValue(0)
-	// lastBidRank is the rank of the lastBid option, with #1 being the option
-	// with the most money.
-	lastBidRank := 1
-	lastBidValue := -1
-	lastBidIsLastPlace := false
-	var lastPlaceOpts []string
-	for _, t := range openTotals {
-		if t.Value == minValue {
-			lastPlaceOpts = append(lastPlaceOpts, t.Option.DisplayName)
-			if !lastBid.IsZero() && t.Option.ShortCode == lastBid.ShortCode {
-				lastBidIsLastPlace = true
-			}
-		} else if diff == 0 {
-			diff = t.Value - minValue
-		}
-		if !lastBid.IsZero() && t.Option.ShortCode == lastBid.ShortCode {
-			lastBidValue = t.Value.Cents()
-		}
-		if lastBidValue >= 0 && t.Value.Cents() > lastBidValue {
-			lastBidRank += 1
-		}
-	}
-
-	// A special message for when the bidder's choice was in last place, and
-	// remains in last place despite their efforts.
-	if len(lastPlaceOpts) == 1 && lastPlaceOpts[0] == lastBid.DisplayName {
-		return fmt.Sprintf("%s is still in last place (down by %s) usedShame", lastPlaceOpts[0], diff)
+	if len(ranks) > 1 {
+		diff = ranks[len(ranks)-2].value - lastPlaceRank.value
 	}
 
 	desc := "Last place: "
-	if len(lastPlaceOpts) > 1 {
+	if len(lastPlaceRank.options) > 1 {
 		desc = "Tie for last place: "
 	}
-	desc += fmt.Sprintf("%s (down by %s)", strings.Join(lastPlaceOpts, ", "), diff)
-	if !lastBid.IsZero() && !lastBidIsLastPlace {
-		desc = fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank, desc)
+	var lastPlaceOptNames []string
+	for _, opt := range lastPlaceRank.options {
+		lastPlaceOptNames = append(lastPlaceOptNames, opt.DisplayName)
 	}
-	return desc
+	desc += fmt.Sprintf("%s (down by %s)", strings.Join(lastPlaceOptNames, ", "), diff)
+	if lastBid.IsZero() {
+		return desc
+	}
+
+	lastBidRank := findRankForBid(ranks, lastBid)
+	if lastBidRank == nil {
+		return desc
+	}
+	lastBidIsLastPlace := lastBidRank.rank == lastPlaceRank.rank
+	// A special message for when the bidder's choice was in last place, and
+	// remains alone in last place despite their efforts.
+	if len(lastPlaceRank.options) == 1 && lastBidIsLastPlace {
+		return fmt.Sprintf("%s is still in last place (down by %s) usedShame", lastBid.DisplayName, diff)
+	}
+	if lastBidIsLastPlace {
+		return desc
+	}
+	return fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank.rank, desc)
 }
 
 func (tt Totals) describeWinners(lastBid Option) string {
@@ -369,6 +394,17 @@ func (tt Totals) describeWinners(lastBid Option) string {
 		desc = fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank, desc)
 	}
 	return desc
+}
+
+func findRankForBid(ranks []*optionRank, bid Option) *optionRank {
+	for _, r := range ranks {
+		for _, opt := range r.options {
+			if opt.ShortCode == bid.ShortCode {
+				return r
+			}
+		}
+	}
+	return nil
 }
 
 // UpdateStats summarizes the changes made to a bid war.

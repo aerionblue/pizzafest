@@ -195,6 +195,7 @@ func TestTotalsToString_LastPlaceStyle(t *testing.T) {
 		{"two options", []int{1000, 994}, "", "Last place: B (down by 0.06)"},
 		{"two options, lastBid for leader", []int{1000, 994}, "A", "A is currently #1. Last place: B (down by 0.06)"},
 		{"two options, lastBid for trailer", []int{1000, 994}, "B", "B is still in last place (down by 0.06) usedShame"},
+		{"two options, lastBid does not exist", []int{1000, 994}, "X", "Last place: B (down by 0.06)"},
 		{"last place has $0", []int{0, 1000}, "", "Last place: A (down by 10.00)"},
 		{"four options", []int{12345, 11037, 9000, 5000}, "", "Last place: D (down by 40.00)"},
 		{"four options, lastBid on 1st place", []int{12345, 11037, 9000, 5000}, "A", "A is currently #1. Last place: D (down by 40.00)"},
