@@ -245,6 +245,7 @@ func TestTotalsToString_WinnersStyle(t *testing.T) {
 		{"top 3 out of 3", 3, []int{200, 100, 300}, "", "Current top 3: C, A, B"},
 		{"2 of 3, lastBid for leader", 2, []int{200, 100, 300}, "C", "C is currently #1. Current top 2: C, A"},
 		{"2 of 3, lastBid for trailer", 2, []int{200, 100, 300}, "B", "B is currently #3. Current top 2: C, A"},
+		{"2 of 3, lastBid does not exist", 2, []int{200, 100, 300}, "X", "Current top 2: C, A"},
 		{"2 of 3, 2-way tie for #1", 2, []int{200, 300, 300}, "C", "C is currently #1. Current top 2: B, C"},
 		{"2 of 3, 2-way tie for #2", 2, []int{200, 200, 300}, "B", "B is currently #2. Current top 2: C, A, B"},
 		{"more winners than options", 10, []int{100, 300}, "", "Current top 10: B, A"},

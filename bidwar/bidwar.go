@@ -353,47 +353,34 @@ func (tt Totals) describeLastPlace(lastBid Option) string {
 }
 
 func (tt Totals) describeWinners(lastBid Option) string {
-	openTotals := tt.openTotals()
-	if len(openTotals) == 0 {
+	ranks := tt.computeRanks()
+	if len(ranks) == 0 {
 		return ""
-	} else if len(openTotals) == 1 {
-		return fmt.Sprintf("%s: %s", openTotals[0].Option.DisplayName, openTotals[0].Value)
-	}
-
-	sort.Sort(sort.Reverse(byCents(openTotals)))
-
-	var threshold donation.CentsValue
-	if len(openTotals) > tt.numberOfWinners {
-		threshold = openTotals[tt.numberOfWinners-1].Value
-	} else {
-		threshold = openTotals[len(openTotals)-1].Value
-	}
-
-	lastBidValue := -1
-	if !lastBid.IsZero() {
-		for _, t := range openTotals {
-			if t.Option.ShortCode == lastBid.ShortCode {
-				lastBidValue = t.Value.Cents()
-				break
-			}
-		}
-	}
-	lastBidRank := 1
-	var leadingOpts []string
-	for _, t := range openTotals {
-		if t.Value >= threshold {
-			leadingOpts = append(leadingOpts, t.Option.DisplayName)
-		}
-		if lastBidValue >= 0 && t.Value.Cents() > lastBidValue {
-			lastBidRank += 1
+	} else if len(ranks) == 1 {
+		if opts := ranks[0].options; len(opts) == 1 {
+			return fmt.Sprintf("%s: %s", opts[0].DisplayName, ranks[0].value)
 		}
 	}
 
-	desc := fmt.Sprintf("Current top %d: %s", tt.numberOfWinners, strings.Join(leadingOpts, ", "))
-	if !lastBid.IsZero() {
-		desc = fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank, desc)
+	var leadingOptNames []string
+	for _, r := range ranks {
+		for _, opt := range r.options {
+			leadingOptNames = append(leadingOptNames, opt.DisplayName)
+		}
+		if len(leadingOptNames) >= tt.numberOfWinners {
+			break
+		}
 	}
-	return desc
+
+	desc := fmt.Sprintf("Current top %d: %s", tt.numberOfWinners, strings.Join(leadingOptNames, ", "))
+	if lastBid.IsZero() {
+		return desc
+	}
+	lastBidRank := findRankForBid(ranks, lastBid)
+	if lastBidRank == nil {
+		return desc
+	}
+	return fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank.rank, desc)
 }
 
 func findRankForBid(ranks []*optionRank, bid Option) *optionRank {
