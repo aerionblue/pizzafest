@@ -233,6 +233,53 @@ func TestTotalsToString_LastPlaceStyle(t *testing.T) {
 	}
 }
 
+func TestTotalsToString_FirstPlaceStyle(t *testing.T) {
+	for _, tc := range []struct {
+		desc        string
+		centsTotals []int
+		lastBid     string
+		want        string
+	}{
+		{"two options", []int{1000, 994}, "", "First place: A (up by 0.06)"},
+		{"two options, lastBid for leader", []int{1000, 994}, "A", "A is in first place (up by 0.06) usedU"},
+		{"two options, lastBid for trailer", []int{1000, 994}, "B", "B is currently #2. First place: A (up by 0.06)"},
+		{"last place has $0", []int{0, 1000}, "", "First place: B (up by 10.00)"},
+		{"four options", []int{12345, 11037, 9000, 5000}, "", "First place: A (up by 13.08)"},
+		{"four options, lastBid on 1st place", []int{12345, 11037, 9000, 5000}, "A", "A is in first place (up by 13.08) usedU"},
+		{"four options, lastBid on 2nd place", []int{12345, 11037, 9000, 5000}, "B", "B is currently #2. First place: A (up by 13.08)"},
+		{"four options, lastBid on 3rd place", []int{12345, 11037, 9000, 5000}, "C", "C is currently #3. First place: A (up by 13.08)"},
+		{"four options, lastBid on 4th place", []int{12345, 11037, 9000, 5000}, "D", "D is currently #4. First place: A (up by 13.08)"},
+		{"tie for first place", []int{150, 500, 500}, "A", "A is currently #3. Tie for first place: B, C (up by 3.50)"},
+		{"lastBid is tied for first", []int{150, 500, 500}, "B", "Tie for first place: B, C (up by 3.50)"},
+		{"first options are tied for first", []int{500, 500, 150}, "", "Tie for first place: A, B (up by 3.50)"},
+		{"all options tied", []int{150, 150, 150}, "", "Tie for first place: A, B, C (up by 0.00)"},
+		{"lastBid is tied, but not first place", []int{500, 300, 300, 100}, "C", "C is currently #2. First place: A (up by 2.00)"},
+		{"one option", []int{999}, "", "A: 9.99"},
+		{"one option with lastBid", []int{999}, "A", "A: 9.99"},
+		{"zero options", []int{}, "", ""},
+	} {
+		var totals []Total
+		var lastBidOption Option
+		for n, cents := range tc.centsTotals {
+			name := string(rune(int('A') + n))
+			opt := Option{DisplayName: name, ShortCode: name}
+			if opt.ShortCode == tc.lastBid {
+				lastBidOption = opt
+			}
+			totals = append(totals, Total{
+				Option: opt,
+				Value:  donation.CentsValue(cents),
+			})
+		}
+		t.Run(tc.desc, func(t *testing.T) {
+			got := Totals{totals: totals, summaryStyle: "FIRST_PLACE"}.Describe(lastBidOption)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestTotalsToString_WinnersStyle(t *testing.T) {
 	for _, tc := range []struct {
 		desc        string
@@ -252,6 +299,7 @@ func TestTotalsToString_WinnersStyle(t *testing.T) {
 		{"one option", 1, []int{999}, "", "A: 9.99"},
 		{"one option with lastBid", 1, []int{999}, "A", "A: 9.99"},
 		{"zero options", 1, []int{}, "", ""},
+		{"1 winner acts the same as FIRST_PLACE", 1, []int{300, 200, 100}, "B", "B is currently #2. First place: A (up by 1.00)"},
 	} {
 		var totals []Total
 		var lastBidOption Option

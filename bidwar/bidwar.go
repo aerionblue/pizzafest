@@ -239,7 +239,12 @@ func (tt Totals) Describe(lastBid Option) string {
 	switch tt.summaryStyle {
 	case "LAST_PLACE":
 		return tt.describeLastPlace(lastBid)
+	case "FIRST_PLACE":
+		return tt.describeFirstPlace(lastBid)
 	case "WINNERS":
+		if tt.numberOfWinners == 1 {
+			return tt.describeFirstPlace(lastBid)
+		}
 		return tt.describeWinners(lastBid)
 	case "ALL":
 	}
@@ -347,6 +352,50 @@ func (tt Totals) describeLastPlace(lastBid Option) string {
 		return fmt.Sprintf("%s is still in last place (down by %s) usedShame", lastBid.DisplayName, diff)
 	}
 	if lastBidIsLastPlace {
+		return desc
+	}
+	return fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank.rank, desc)
+}
+
+func (tt Totals) describeFirstPlace(lastBid Option) string {
+	ranks := tt.computeRanks()
+	if len(ranks) == 0 {
+		return ""
+	} else if len(ranks) == 1 {
+		if opts := ranks[0].options; len(opts) == 1 {
+			return fmt.Sprintf("%s: %s", opts[0].DisplayName, ranks[0].value)
+		}
+	}
+
+	firstPlaceRank := ranks[0]
+	diff := donation.CentsValue(0)
+	if len(ranks) > 1 {
+		diff = firstPlaceRank.value - ranks[1].value
+	}
+
+	desc := "First place: "
+	if len(firstPlaceRank.options) > 1 {
+		desc = "Tie for first place: "
+	}
+	var firstPlaceOptNames []string
+	for _, opt := range firstPlaceRank.options {
+		firstPlaceOptNames = append(firstPlaceOptNames, opt.DisplayName)
+	}
+	desc += fmt.Sprintf("%s (up by %s)", strings.Join(firstPlaceOptNames, ", "), diff)
+	if lastBid.IsZero() {
+		return desc
+	}
+
+	lastBidRank := findRankForBid(ranks, lastBid)
+	if lastBidRank == nil {
+		return desc
+	}
+	lastBidIsFirstPlace := lastBidRank.rank == firstPlaceRank.rank
+	// A special message for when the bidder's choice is alone in first place.
+	if len(firstPlaceRank.options) == 1 && lastBidIsFirstPlace {
+		return fmt.Sprintf("%s is in first place (up by %s) usedU", lastBid.DisplayName, diff)
+	}
+	if lastBidIsFirstPlace {
 		return desc
 	}
 	return fmt.Sprintf("%s is currently #%d. %s", lastBid.DisplayName, lastBidRank.rank, desc)
